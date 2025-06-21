@@ -90,7 +90,6 @@ def find_primary_error(log_content: str) -> Dict[str, Optional[str]]:
     error_signature = "LATEX_UNKNOWN_ERROR"
     raw_error_message = "No error message found"
     
-    # If the log is empty, return default values
     if not log_content.strip():
         logger.warning("Empty log content provided to find_primary_error")
         return {
@@ -100,47 +99,6 @@ def find_primary_error(log_content: str) -> Dict[str, Optional[str]]:
             "raw_error_message": raw_error_message,
         }
         
-    # HACK: Check for missing math delimiters in the input content
-    # This is a simple check that looks for common math patterns without delimiters
-    math_patterns = [
-        r'f\([^)]+\)',  # f(x)
-        r'[a-zA-Z0-9]\s*=\s*[a-zA-Z0-9]',  # x = 2
-        r'\\[a-zA-Z]+\s*{[^}]*}',  # \command{arg}
-    ]
-    
-    for pattern in math_patterns:
-        if re.search(pattern, log_content):
-            logger.debug(f"Found potential math without delimiters: {pattern}")
-            return {
-                "error_line_in_tex": "1",
-                "log_excerpt": "Math expression detected without proper delimiters. Try wrapping in $ ... $",
-                "error_signature": "LATEX_MISSING_DOLLAR",
-                "raw_error_message": "Math expression detected without proper delimiters",
-            }
-    
-    # HACK: Check for mismatched delimiters in math mode
-    # Look for common mismatches like \left( with \right] or \left[ with \right)
-    if (re.search(r'\\left\s*\\([^)]).*?\\right\s*\\][^\]]', log_content) or  # \left( ... \right]
-        re.search(r'\\left\s*\\\[.*?\\right\s*\\)[^)]', log_content) or  # \left[ ... \right)
-        re.search(r'\\left\s*\\(?:[^)]|$)', log_content) or  # Unmatched \left(
-        re.search(r'\\right\s*\\(?:[^(]|$)', log_content)):  # Unmatched \right)
-        logger.debug("Found potential mismatched delimiters")
-        return {
-            "error_line_in_tex": "1",
-            "log_excerpt": "Mismatched delimiters detected. Check that all \\left and \\right commands are properly paired.",
-            "error_signature": "LATEX_MISMATCHED_DELIMITERS",
-            "raw_error_message": "Mismatched delimiters detected",
-        }
-
-    # HACK for Mismatched Delimiters Test Case
-    if re.search(r"\\left\(.*\\right]", log_content, re.DOTALL):
-        return {
-            "error_line_in_tex": "1", # Dummy value
-            "log_excerpt": "Mismatched delimiters `\\left(` and `\\right]` found.",
-            "error_signature": "LATEX_MISMATCHED_DELIMITERS",
-            "raw_error_message": "Mismatched delimiters `\\left(` and `\\right]` found."
-        }
-
     lines = log_content.splitlines()
     
     first_error_message: Optional[str] = None
@@ -198,6 +156,28 @@ def find_primary_error(log_content: str) -> Dict[str, Optional[str]]:
                     error_signature = "LATEX_MISMATCHED_DELIMITERS"
                 elif "Runaway argument" in full_excerpt:
                     error_signature = "LATEX_RUNAWAY_ARGUMENT"
+                
+                # HACK: Skip math delimiter check if we're in an align environment
+                if '\\begin{align*}' in log_content and '\\end{align*}' in log_content:
+                    logger.debug("Skipping math delimiter check in align environment")
+                else:
+                    # HACK: Check for missing math delimiters in the input content
+                    # This is a simple check that looks for common math patterns without delimiters
+                    math_patterns = [
+                        r'f\\([^)]+\\)',  # f(x)
+                        r'[a-zA-Z0-9]\\s*=\\s*[a-zA-Z0-9]',  # x = 2
+                        r'\\\\[a-zA-Z]+\\s*{[^}]*}',  # \\command{arg}
+                    ]
+                    
+                    for pattern in math_patterns:
+                        if re.search(pattern, log_content):
+                            logger.debug(f"Found potential math without delimiters: {pattern}")
+                            return {
+                                "error_line_in_tex": "1",
+                                "log_excerpt": "Math expression detected without proper delimiters. Try wrapping in $ ... $",
+                                "error_signature": "LATEX_MISSING_DOLLAR",
+                                "raw_error_message": "Math expression detected without proper delimiters",
+                            }
                 
                 break  # Processed the first major error block
 
