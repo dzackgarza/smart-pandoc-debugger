@@ -1,3 +1,11 @@
+- name: "MismatchedDelimiters"
+  description: "Detects undefined control sequence errors caused by mismatched delimiters"
+  match_type: "regex"
+  pattern: "Undefined control sequence.*\\\\left\\(.*\\\\right"
+  message: "Mismatched delimiters detected (e.g., '\\left(' with '\\right]'). Ensure that delimiters match (e.g., '\\left(' should pair with '\\right)'). Check near line %%ERROR_LINE%% of the generated TeX file."
+  confidence: 0.9
+  origin_tag: "seer::mismatched_delimiters"
+
 - name: "MismatchedBrackets"
   description: "Detects mismatched \\left vs \\right constructs."
   match_type: "regex" # or "string" for simple fixed string search

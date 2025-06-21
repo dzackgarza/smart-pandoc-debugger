@@ -21,9 +21,11 @@
 #          - Updates `DiagnosticJob` based on the specialist's result.
 #   - Returns the updated `DiagnosticJob` model instance.
 #   - FAILS VIOLENTLY for unhandled Python errors from specialists or unmet assertions.
-#     Catches specific operational errors (Tool not found, Timeout) from specialists to create leads.
-#   - RETAINS TEMPORARY FILES INDEFINITELY (created by Miner itself for MD file).
-#     Specialists manage their own temporary files if any beyond what Miner provides.
+#     Catches specific operational errors (Tool not found, Timeout) explicitly raised by
+#     specialists to create informative leads before re-raising.
+#   - RETAINS TEMPORARY FILES INDEFINITELY (created by Miner itself for the input MD file).
+#     Specialist modules manage their own temporary artifacts beyond paths Miner provides.
+#     Miner logs the main temporary directory it creates.
 #
 # Interface (as called by `manager_runner.py`):
 #   - Input: `DiagnosticJob` Pydantic model.
@@ -31,8 +33,8 @@
 #   - Standard CLI: Expects `--process-job` flag.
 #
 # Environment Assumptions (Asserted or will cause failure if unmet):
-#   - `pandoc` and `pdflatex` are in PATH (checked by specialists).
-#   - All SDE utility and team modules are importable.
+#   - `pandoc` and `pdflatex` are in PATH (this will be checked by the specialist modules).
+#   - All SDE utility and necessary team modules are importable.
 # --------------------------------------------------------------------------------
 
 import sys
@@ -42,14 +44,35 @@ import logging
 import argparse
 import tempfile
 import pathlib
-import subprocess # For specific exception types from specialists
-from typing import List, Optional, Dict, Any # Keep for type hinting
+import subprocess # For specific exception types like FileNotFoundError, TimeoutExpired
+from typing import List, Optional, Dict, Any # Added Any
 
 # SDE utilities and Miner team specialists
+# These imports will fail if the modules/classes are not defined or PYTHONPATH isn't right.
 from utils.data_model import DiagnosticJob, ActionableLead, SourceContextSnippet # type: ignore
 from managers.miner_team.markdown_proofer import run_markdown_checks # type: ignore
-from managers.miner_team.pandoc_tex_converter import convert_md_to_tex, PandocConversionResult # type: ignore
-from managers.miner_team.tex_compiler import compile_tex_to_pdf, TexCompilationResult # type: ignore
+
+# Import the specialist functions and their result Pydantic models
+# Assuming these specialists now return Pydantic models from utils.data_model
+try:
+    from managers.miner_team.pandoc_tex_converter import convert_md_to_tex
+    from managers.miner_team.tex_compiler import compile_tex_to_pdf
+    # Import the Pydantic result types if they are defined in utils.data_model
+    from utils.data_model import PandocConversionResult, TexCompilationResult # type: ignore
+    SPECIALISTS_IMPORTED = True
+except ImportError as e:
+    logging.critical(f"CRITICAL MINER ERROR: Failed to import specialist modules or their result types. Error: {e}", exc_info=True)
+    SPECIALISTS_IMPORTED = False
+    # Define dummy functions if imports fail, to allow script parsing but ensure failure at runtime
+    # This also helps linters/type checkers if they can't resolve the conditional imports easily.
+    class PandocConversionResult: pass # type: ignore
+    class TexCompilationResult: pass # type: ignore
+    def convert_md_to_tex(*_args, **_kwargs) -> PandocConversionResult: # type: ignore
+        raise ImportError("pandoc_tex_converter specialist module or result type not found/importable.")
+    def compile_tex_to_pdf(*_args, **_kwargs) -> TexCompilationResult: # type: ignore
+        raise ImportError("tex_compiler specialist module or result type not found/importable.")
+# --- End Specialist Imports ---
+
 
 # --- Logging Setup ---
 logger = logging.getLogger(__name__)
@@ -69,41 +92,39 @@ OUTCOME_MD_TO_TEX_CONVERSION_FAILED = "MarkdownError_MdToTexConversionFailed"
 OUTCOME_SUCCESS_PDF_VALID = "CompilationSuccess_PDFShouldBeValid"
 OUTCOME_MD_TO_TEX_SUCCESS_PROCEED_TO_TEX_COMPILE = "MDtoTeX_Success_ProceedToTeXCompile"
 OUTCOME_TEX_COMPILATION_FAILED_FOR_INVESTIGATION = "TexCompilationError_LeadsPendingInvestigation"
-OUTCOME_MINER_INFRASTRUCTURE_ERROR = "MinerInfrastructureError" # For Miner's own setup like tempdir
-# Specific timeout/tool error outcomes for leads created by Miner when specialists raise these
-OUTCOME_MINER_PANDOC_TOOL_ERROR = "Miner_PandocToolError" # e.g. Pandoc not found or timed out
-OUTCOME_MINER_PDFLATEX_TOOL_ERROR = "Miner_PdflatexToolError" # e.g. pdflatex not found or timed out
+OUTCOME_MINER_INFRASTRUCTURE_ERROR = "MinerInfrastructureError"
+OUTCOME_MINER_SPECIALIST_TOOL_ERROR = "MinerSpecialistToolError" # Used if specialist itself reports tool issue via lead
+OUTCOME_MINER_SPECIALIST_COMMAND_NOT_FOUND = "MinerSpecialistCommandNotFound"
+OUTCOME_MINER_SPECIALIST_TIMEOUT = "MinerSpecialistTimeout"
 OUTCOME_MINER_UNEXPECTED_CRITICAL_ERROR = "MinerUnexpectedCriticalError"
 OUTCOME_MINER_CRASHED_IN_MAIN_LOGIC = "MinerCrashedInMainLogic"
 
 
-def _create_miner_level_tool_failure_lead( # For when specialists raise FileNotFoundError/Timeout
+def _create_miner_level_tool_failure_lead(
     problem_description: str,
-    source_component_tool: str, # e.g., "pandoc_tex_converter", "tex_compiler"
-    stage: str, # e.g., "md-to-tex_specialist_call", "tex-to-pdf_specialist_call"
-    exception_obj: Exception
+    source_component_tool_name: str, # e.g., "pandoc_tex_converter (calling pandoc)"
+    stage_description: str, 
+    exception_obj: Exception # The exception caught by Miner
 ) -> ActionableLead:
-    """Helper to create ActionableLead when a specialist call results in critical tool error."""
+    """Helper for when Miner catches an exception from a specialist call."""
     details = {
         "error_type": type(exception_obj).__name__,
-        "exception_str": str(exception_obj)
+        "exception_str": str(exception_obj),
+        "failing_specialist_or_tool": source_component_tool_name
     }
-    if isinstance(exception_obj, FileNotFoundError):
-        details["missing_command"] = exception_obj.filename
-    elif isinstance(exception_obj, subprocess.TimeoutExpired):
-        details["timeout_seconds"] = exception_obj.timeout
+    if isinstance(exception_obj, FileNotFoundError) and hasattr(exception_obj, 'filename'):
+        details["missing_command_hint"] = exception_obj.filename
+    elif isinstance(exception_obj, subprocess.TimeoutExpired) and hasattr(exception_obj, 'cmd'):
+        details["timeout_seconds_hint"] = exception_obj.timeout
         details["command_hint"] = str(exception_obj.cmd)
 
     return ActionableLead(
         source_service="Miner", 
         problem_description=problem_description,
         primary_context_snippets=[],
-        internal_details_for_oracle={
-            "tool_responsible": source_component_tool, # The specialist that failed
-            "stage_of_failure": stage,
-            **details # Merge specific exception details
-        }
+        internal_details_for_oracle=details
     )
+
 
 def process_job(diagnostic_job_model: DiagnosticJob) -> DiagnosticJob:
     assert isinstance(diagnostic_job_model, DiagnosticJob), "Input must be a DiagnosticJob Pydantic model."
@@ -112,6 +133,7 @@ def process_job(diagnostic_job_model: DiagnosticJob) -> DiagnosticJob:
     logger.info(f"[{case_id}] Miner V1.1.0: Starting processing (delegating to specialists).")
     dj.current_pipeline_stage = "Miner_Initializing"
 
+    assert SPECIALISTS_IMPORTED, "Miner critical: Specialist modules could not be imported."
     assert dj.original_markdown_content and dj.original_markdown_content.strip(), \
         f"[{case_id}] Miner: Precondition failed - original_markdown_content is empty."
 
@@ -120,31 +142,31 @@ def process_job(diagnostic_job_model: DiagnosticJob) -> DiagnosticJob:
         temp_dir_path_str = tempfile.mkdtemp(prefix=f"sde_miner_{case_id}_")
         temp_dir = pathlib.Path(temp_dir_path_str)
         dj.internal_tool_outputs_verbatim["miner_temp_dir"] = str(temp_dir)
-        logger.info(f"[{case_id}] Miner: Using temporary directory for MD file: {temp_dir}")
-    except Exception as e_tempdir: # Should ideally not happen if OS is stable
+        logger.info(f"MINER TEMP DIR for Case {case_id} (NOT auto-cleaned): {temp_dir}")
+    except Exception as e_tempdir: # Should be rare
         logger.critical(f"[{case_id}] Miner: FATAL - Failed to create temporary directory: {e_tempdir}", exc_info=True)
         dj.final_job_outcome = OUTCOME_MINER_INFRASTRUCTURE_ERROR
         dj.current_pipeline_stage = "Miner_Failed_TempDir"
         if dj.actionable_leads is None: dj.actionable_leads = []
-        # Using direct ActionableLead instantiation for this critical internal failure
         dj.actionable_leads.append(ActionableLead( 
             source_service="Miner",
-            problem_description=f"Miner infrastructure failure: Could not create temp directory. System error: {e_tempdir}",
+            problem_description=f"Miner infrastructure failure: Could not create temp directory. System error: {type(e_tempdir).__name__}: {e_tempdir}",
             internal_details_for_oracle={"error_type": "InfrastructureError_TempDir", "exception_str": str(e_tempdir)}
         ))
-        raise # Crash Miner if temp dir cannot be made
+        raise # Crash Miner
 
-    md_file = temp_dir / "input.md"
-    tex_file = temp_dir / "output.tex" # Specialists will write to this path in Miner's temp_dir
-    
+    md_file_path = temp_dir / "input.md"
+    # Define where specialists should place their primary outputs for Miner to potentially use
+    pandoc_output_tex_file_path = temp_dir / "pandoc_output.tex"
+    # tex_compiler will use the above TeX file and place its PDF in temp_dir by default
+
     try:
-        md_file.write_text(dj.original_markdown_content, encoding="utf-8")
+        md_file_path.write_text(dj.original_markdown_content, encoding="utf-8")
 
         # --- 0. Markdown Proofreading ---
         dj.current_pipeline_stage = "Miner_MarkdownProofing"
         logger.info(f"[{case_id}] Miner: Delegating to markdown_proofer.")
-        # run_markdown_checks can raise if checkers are missing or its own utils fail
-        markdown_leads = run_markdown_checks(dj.case_id, str(md_file.resolve()), calling_manager_name="Miner")
+        markdown_leads: List[ActionableLead] = run_markdown_checks(dj.case_id, str(md_file_path.resolve()), calling_manager_name="Miner")
         
         if markdown_leads:
             logger.warning(f"[{case_id}] Miner: Markdown proofreading found {len(markdown_leads)} issues.")
@@ -154,119 +176,113 @@ def process_job(diagnostic_job_model: DiagnosticJob) -> DiagnosticJob:
             dj.md_to_tex_conversion_successful = False
             dj.final_job_outcome = OUTCOME_MD_PROOFING_FAILED
             dj.current_pipeline_stage = "Miner_MarkdownProofingFailed"
-            return dj # Early exit
+            return dj
 
         logger.info(f"[{case_id}] Miner: Markdown proofreading passed.")
 
         # --- 1. MD-to-TeX Conversion (Delegated) ---
         dj.current_pipeline_stage = "Miner_MDtoTeX_Delegation"
-        dj.md_to_tex_conversion_attempted = True # Mark attempt before calling specialist
-        logger.info(f"[{case_id}] Miner: Delegating MD-to-TeX to pandoc_tex_converter for {md_file} -> {tex_file}.")
+        dj.md_to_tex_conversion_attempted = True
+        logger.info(f"[{case_id}] Miner: Delegating MD-to-TeX to pandoc_tex_converter for {md_file_path} -> {pandoc_output_tex_file_path}.")
         
-        pandoc_result: PandocConversionResult = convert_md_to_tex(
-            case_id, md_file, tex_file
+        pandoc_result: PandocConversionResult = convert_md_to_tex( # type: ignore # If using placeholder
+            case_id=case_id, 
+            markdown_file_path=md_file_path, 
+            output_tex_file_path=pandoc_output_tex_file_path
+            # pandoc_options_override can be passed here if Miner needs to customize
         )
         
-        # Update DiagnosticJob from PandocConversionResult
         dj.md_to_tex_conversion_successful = pandoc_result.conversion_successful
         dj.generated_tex_content = pandoc_result.generated_tex_content
         dj.md_to_tex_raw_log = pandoc_result.pandoc_raw_log
         if pandoc_result.actionable_lead:
             if dj.actionable_leads is None: dj.actionable_leads = []
-            dj.actionable_leads.append(pandoc_result.actionable_lead)
+            dj.actionable_leads.append(pandoc_result.actionable_lead) # Specialist already set source_service to "Miner"
             dj.final_job_outcome = OUTCOME_MD_TO_TEX_CONVERSION_FAILED
             dj.current_pipeline_stage = "Miner_MdToTexFailedViaSpecialist"
-            logger.info(f"[{case_id}] Miner: pandoc_tex_converter reported MD-to-TeX failure.")
             return dj
 
         logger.info(f"[{case_id}] Miner: pandoc_tex_converter reported MD-to-TeX success.")
         dj.final_job_outcome = OUTCOME_MD_TO_TEX_SUCCESS_PROCEED_TO_TEX_COMPILE
 
         # --- 2. TeX-to-PDF Compilation (Delegated) ---
-        assert dj.generated_tex_content, f"[{case_id}] Miner: TeX content missing after supposed MD-to-TeX success."
-        # tex_file should have been written by pandoc_tex_converter if successful.
-        assert tex_file.is_file(), f"[{case_id}] Miner: TeX file {tex_file} not found after MD-to-TeX success."
+        assert dj.generated_tex_content, f"[{case_id}] Miner: TeX content missing after MD-to-TeX success."
+        assert pandoc_output_tex_file_path.is_file(), \
+            f"[{case_id}] TeX file {pandoc_output_tex_file_path} (expected from pandoc_tex_converter) not found for TeX compilation."
 
         dj.current_pipeline_stage = "Miner_TeXtoPDF_Delegation"
-        dj.tex_to_pdf_compilation_attempted = True # Mark attempt
-        logger.info(f"[{case_id}] Miner: Delegating TeX-to-PDF to tex_compiler for {tex_file}.")
+        dj.tex_to_pdf_compilation_attempted = True
+        logger.info(f"[{case_id}] Miner: Delegating TeX-to-PDF to tex_compiler specialist using {pandoc_output_tex_file_path}.")
 
-        tex_comp_result: TexCompilationResult = compile_tex_to_pdf(
-            case_id, tex_file, temp_dir # tex_compiler writes PDF to temp_dir
+        tex_comp_result: TexCompilationResult = compile_tex_to_pdf( # type: ignore # If using placeholder
+            case_id=case_id, 
+            tex_file_path=pandoc_output_tex_file_path, 
+            output_directory=temp_dir # tex_compiler writes PDF to this directory
         )
 
-        # Update DiagnosticJob from TexCompilationResult
         dj.tex_to_pdf_compilation_successful = tex_comp_result.compilation_successful
         dj.tex_compiler_raw_log = tex_comp_result.tex_compiler_raw_log
-        # Note: tex_compiler specialist provides a lead for *tool* failures (timeout, not found),
-        # not for TeX content errors. TeX content errors mean compilation_successful is False,
-        # and Investigator will use the raw_log.
-
-        if tex_comp_result.actionable_lead: # This implies a tool failure within tex_compiler
+        
+        # If tex_compiler had a tool failure (e.g., pdflatex not found/timeout), its actionable_lead would be set.
+        if tex_comp_result.actionable_lead:
             if dj.actionable_leads is None: dj.actionable_leads = []
-            dj.actionable_leads.append(tex_comp_result.actionable_lead)
-            # Set a specific outcome for this kind of failure if not already implied by successful=False
-            dj.final_job_outcome = OUTCOME_MINER_PDFLATEX_TOOL_ERROR # Example
+            dj.actionable_leads.append(tex_comp_result.actionable_lead) # Specialist set source_service to "Miner"
+            # The specialist itself would not set final_job_outcome on dj.
+            # Miner interprets the result.
+            dj.final_job_outcome = OUTCOME_MINER_SPECIALIST_TOOL_ERROR # A more generic outcome
             dj.current_pipeline_stage = "Miner_TexToPdfFailedViaSpecialistToolError"
-            logger.error(f"[{case_id}] Miner: tex_compiler reported a tool failure: {tex_comp_result.actionable_lead.problem_description}")
-            return dj # Return early due to pdflatex tool issue
+            # We might want a more specific outcome based on lead's internal details here if needed
+            # e.g. OUTCOME_MINER_PDFLATEX_TOOL_ERROR
+            if tex_comp_result.actionable_lead.internal_details_for_oracle and \
+               "pdflatex" in str(tex_comp_result.actionable_lead.internal_details_for_oracle.get("tool_responsible")).lower():
+                 dj.final_job_outcome = f"Miner_PdflatexToolError_{tex_comp_result.actionable_lead.internal_details_for_oracle.get('stage_of_failure', 'UnknownStage')}"
 
+            return dj
+
+        # If no tool failure lead from tex_compiler, then outcome is based on compilation_successful
         if dj.tex_to_pdf_compilation_successful:
-            logger.info(f"[{case_id}] Miner: tex_compiler reported TeX-to-PDF success. PDF at {tex_comp_result.pdf_file_path}")
+            logger.info(f"[{case_id}] Miner: tex_compiler reported TeX-to-PDF success. PDF: {tex_comp_result.pdf_file_path or 'N/A'}")
             dj.final_job_outcome = OUTCOME_SUCCESS_PDF_VALID
-            # We might want to store dj.pdf_file_path = str(tex_comp_result.pdf_file_path) if model supports
+            if tex_comp_result.pdf_file_path: # Store PDF path if available and successful
+                 dj.internal_tool_outputs_verbatim["compiled_pdf_path_by_miner_specialist"] = str(tex_comp_result.pdf_file_path)
         else:
-            logger.warning(f"[{case_id}] Miner: tex_compiler reported TeX-to-PDF failure. Investigator will use the log.")
+            logger.warning(f"[{case_id}] Miner: tex_compiler reported TeX-to-PDF FAILED (content error). Investigator will use the log.")
             dj.final_job_outcome = OUTCOME_TEX_COMPILATION_FAILED_FOR_INVESTIGATION
-            # No specific leads from Miner for TeX content errors here; Investigator handles it.
-
-    # Catch exceptions that specialists (pandoc_tex_converter, tex_compiler) are designed to propagate
-    # These indicate problems with the tools themselves, not the content they process (unless it's a crash from bad content)
-    except FileNotFoundError as e_fnf: # Propagated from a specialist via process_runner
-        tool_name_from_specialist = "pandoc" if "pandoc" in str(e_fnf.filename).lower() else \
-                                    "pdflatex" if "pdflatex" in str(e_fnf.filename).lower() else \
-                                    e_fnf.filename or "UnknownTool"
-        logger.critical(f"[{case_id}] Miner: FATAL - Specialist reported command not found: {tool_name_from_specialist}. Temp dir: {temp_dir_path_str}", exc_info=True)
-        dj.final_job_outcome = OUTCOME_MINER_INFRASTRUCTURE_ERROR
-        dj.current_pipeline_stage = f"Miner_Failed_SpecialistCommandNotFound_{tool_name_from_specialist}"
+            
+    # Catch specific errors that might propagate from specialist calls (if they re-raise them)
+    # This is for errors like tool executable not found, or tool timeout.
+    except FileNotFoundError as e_fnf:
+        tool_name_hint = e_fnf.filename or "UnknownExternalTool"
+        logger.critical(f"[{case_id}] Miner: FATAL - Specialist likely failed as command '{tool_name_hint}' not found. Temp dir: {temp_dir_path_str}", exc_info=True)
+        dj.final_job_outcome = OUTCOME_MINER_SPECIALIST_COMMAND_NOT_FOUND
+        dj.current_pipeline_stage = "Miner_Failed_SpecialistCommandNotFound"
         if dj.actionable_leads is None: dj.actionable_leads = []
         dj.actionable_leads.append(_create_miner_level_tool_failure_lead(
-            problem_description=f"Required command '{tool_name_from_specialist}' not found by specialist. Ensure it is installed and in system PATH.",
-            source_component_tool=f"Specialist({tool_name_from_specialist})", stage="command_check",
-            exception_obj=e_fnf
+            problem_description=f"A required specialist tool ('{tool_name_hint}') was not found. Ensure it is installed and in system PATH.",
+            source_component_tool_name=tool_name_hint, stage_description="specialist_tool_execution", exception_obj=e_fnf
         ))
-        raise # Re-raise to crash Miner as this is a setup/env issue.
-    except subprocess.TimeoutExpired as e_timeout: # Propagated from a specialist
-        tool_name_from_specialist_timeout = "UnknownTool"
-        if e_timeout.cmd: # Try to determine which tool
-            cmd_str = str(e_timeout.cmd).lower()
-            tool_name_from_specialist_timeout = "pandoc" if "pandoc" in cmd_str else \
-                                               "pdflatex" if "pdflatex" in cmd_str else \
-                                               (e_timeout.cmd[0] if isinstance(e_timeout.cmd, list) and e_timeout.cmd else "SpecialistTool")
-
-        logger.error(f"[{case_id}] Miner: Specialist reported subprocess timeout for {tool_name_from_specialist_timeout}: {e_timeout}. Temp dir: {temp_dir_path_str}", exc_info=True)
-        dj.final_job_outcome = (OUTCOME_MINER_PANDOC_TIMEOUT if tool_name_from_specialist_timeout == "pandoc" 
-                                else OUTCOME_MINER_PDFLATEX_TIMEOUT if tool_name_from_specialist_timeout == "pdflatex" 
-                                else f"Miner_SpecialistToolTimeout_{tool_name_from_specialist_timeout}")
-        dj.current_pipeline_stage = f"Miner_Failed_SpecialistTimeout_{tool_name_from_specialist_timeout}"
+        raise 
+    except subprocess.TimeoutExpired as e_timeout:
+        tool_name_hint = str(e_timeout.cmd) if e_timeout.cmd else "UnknownSpecialistTool"
+        logger.error(f"[{case_id}] Miner: Specialist tool '{tool_name_hint}' timed out. Temp dir: {temp_dir_path_str}", exc_info=True)
+        dj.final_job_outcome = OUTCOME_MINER_SPECIALIST_TIMEOUT
+        dj.current_pipeline_stage = "Miner_Failed_SpecialistTimeout"
         if dj.actionable_leads is None: dj.actionable_leads = []
         dj.actionable_leads.append(_create_miner_level_tool_failure_lead(
-             problem_description=f"Specialist tool '{tool_name_from_specialist_timeout}' timed out after {e_timeout.timeout} seconds.",
-             source_component_tool=f"Specialist({tool_name_from_specialist_timeout})", stage="execution_timeout",
-             exception_obj=e_timeout
+             problem_description=f"A specialist tool ('{tool_name_hint}') timed out after {e_timeout.timeout}s.",
+             source_component_tool_name=tool_name_hint, stage_description="specialist_tool_execution_timeout", exception_obj=e_timeout
         ))
-        raise # Re-raise
-    except Exception as e_general: # Catch any other truly unexpected exception from specialists or Miner's own logic
+        raise 
+    except Exception as e_general: 
         logger.critical(f"[{case_id}] Miner: UNEXPECTED CRITICAL ERROR in process_job. Temp dir: {temp_dir_path_str}: {e_general}", exc_info=True)
         dj.final_job_outcome = OUTCOME_MINER_UNEXPECTED_CRITICAL_ERROR
         dj.current_pipeline_stage = "Miner_Crashed_ProcessJobUnhandled"
         if dj.actionable_leads is None: dj.actionable_leads = []
         dj.actionable_leads.append(_create_miner_level_tool_failure_lead(
-             problem_description=f"Miner encountered an unexpected critical error in its main processing logic: {type(e_general).__name__}",
-             source_component_tool="MinerCoreLogic", stage="runtime_error_process_job",
-             exception_obj=e_general
+             problem_description=f"Miner encountered an unexpected critical error: {type(e_general).__name__}",
+             source_component_tool_name="MinerCoreLogic", stage_description="runtime_error_process_job", exception_obj=e_general
         ))
-        raise # Re-raise
+        raise 
 
     dj.current_pipeline_stage = "Miner_Complete"
     logger.info(f"[{case_id}] Miner: Processing finished. Final Outcome: {dj.final_job_outcome}")
@@ -274,7 +290,7 @@ def process_job(diagnostic_job_model: DiagnosticJob) -> DiagnosticJob:
 
 # --- Main CLI Block ---
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="SDE Miner Manager V1.1.0 (Delegating to Specialists)")
+    parser = argparse.ArgumentParser(description="SDE Miner Manager V1.1.0 (Delegates to Specialists)")
     parser.add_argument('--process-job', action='store_true', help="Required flag to process DiagnosticJob JSON from stdin.")
     args = parser.parse_args()
 
@@ -291,11 +307,12 @@ if __name__ == "__main__":
     
     final_dj_state_for_output = diagnostic_job_model_input 
     try:
+        assert SPECIALISTS_IMPORTED, "Miner main: CRITICAL - Specialist modules could not be imported at script start."
         final_dj_state_for_output = process_job(diagnostic_job_model_input)
     except Exception as e_crash: 
-        logger.critical(f"[{case_id_main}] Miner (__main__): CRASH from process_job(): {e_crash}", exc_info=True)
+        # This block catches crashes propagated from process_job or from the SPECIALISTS_IMPORTED assertion
+        logger.critical(f"[{case_id_main}] Miner (__main__): CRASH from process_job() or specialist import: {e_crash}", exc_info=True)
         
-        # Ensure final_job_outcome and current_pipeline_stage reflect the crash
         current_outcome = getattr(final_dj_state_for_output, 'final_job_outcome', None)
         is_already_error_outcome = current_outcome and any(
             err_indicator in str(current_outcome).lower() 
@@ -311,26 +328,33 @@ if __name__ == "__main__":
         if not is_already_failed_stage:
             final_dj_state_for_output.current_pipeline_stage = "Miner_Crashed_CaughtInMain" # type: ignore
         
-        # Add a generic lead about this __main__ level crash if no specific critical lead already exists
+        CRITICAL_LEAD_KEYWORDS = ["crashed", "fatal", "timeout", "command not found", "infrastructure", "critical error", "import specialist"]
         is_critical_lead_present = False
-        if isinstance(final_dj_state_for_output.actionable_leads, list):
-            for lead_item in final_dj_state_for_output.actionable_leads:
-                if isinstance(lead_item, ActionableLead): # Check type
-                    desc_lower = lead_item.problem_description.lower()
-                    if any(keyword in desc_lower for keyword in CRITICAL_LEAD_KEYWORDS): # Define CRITICAL_LEAD_KEYWORDS
-                        is_critical_lead_present = True
-                        break
+        if isinstance(getattr(final_dj_state_for_output, 'actionable_leads', None), list):
+            for lead_item in final_dj_state_for_output.actionable_leads: # type: ignore
+                if isinstance(lead_item, ActionableLead) and any(keyword in lead_item.problem_description.lower() for keyword in CRITICAL_LEAD_KEYWORDS):
+                    is_critical_lead_present = True
+                    break
         
-        CRITICAL_LEAD_KEYWORDS = ["crashed", "fatal", "timeout", "command not found", "infrastructure error", "critical error"]
         if not is_critical_lead_present:
-            crash_lead_desc = f"Miner script process_job() crashed unexpectedly (caught in __main__): {type(e_crash).__name__}"
-            if final_dj_state_for_output.actionable_leads is None: final_dj_state_for_output.actionable_leads = []
-            # Use _create_miner_level_tool_failure_lead for consistency, adapting it
-            final_dj_state_for_output.actionable_leads.append(_create_miner_level_tool_failure_lead(
+            crash_lead_desc = f"Miner script process_job() or specialist import failed: {type(e_crash).__name__}"
+            if final_dj_state_for_output.actionable_leads is None: final_dj_state_for_output.actionable_leads = [] # type: ignore
+            
+            # Use the helper, adapting its usage slightly for this context
+            internal_details_for_crash = {
+                "error_type": type(e_crash).__name__,
+                "exception_str": str(e_crash)
+            }
+            if isinstance(e_crash, ImportError):
+                 internal_details_for_crash["missing_module_hint"] = e_crash.name
+
+            final_dj_state_for_output.actionable_leads.append(ActionableLead( # type: ignore
+                source_service="Miner", 
                 problem_description=crash_lead_desc,
-                source_component_tool="MinerMainBlock", stage="runtime_crash_handling",
-                exception_obj=e_crash # Pass the exception object
+                primary_context_snippets=[], 
+                internal_details_for_oracle=internal_details_for_crash
             ))
+
 
         output_json_str = final_dj_state_for_output.model_dump_json(
             indent=2 if os.environ.get("SDE_PRETTY_PRINT_JSON", "false").lower() == "true" else None
@@ -339,7 +363,6 @@ if __name__ == "__main__":
         sys.stdout.flush()
         sys.exit(1) 
 
-    # If process_job completed without raising an exception to here:
     output_json_str = final_dj_state_for_output.model_dump_json(
         indent=2 if os.environ.get("SDE_PRETTY_PRINT_JSON", "false").lower() == "true" else None
     )

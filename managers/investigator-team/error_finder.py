@@ -88,41 +88,57 @@ def find_primary_error(log_content: str) -> Dict[str, Optional[str]]:
     error_signature: Optional[str] = "LATEX_UNKNOWN_ERROR" # Default if nothing found
 
     # Max lines to capture for an excerpt after the initial "!" line
-    MAX_EXCERPT_CONTEXT_LINES = 10 
+    MAX_EXCERPT_CONTEXT_LINES = 20  # Increased to capture more context
     # Max lines to search for ". l.<num>" after an "!" line
-    MAX_LINES_FOR_LINE_NUM_SEARCH = 5 
+    MAX_LINES_FOR_LINE_NUM_SEARCH = 10  # Increased to find line numbers in longer error messages
 
+    # First, try to find the error message and its context
     for i, line in enumerate(lines):
-        if line.startswith("! "): # Found a potential primary error line
-            if first_error_message is None: # Capture the first one encountered
+        if line.startswith("! "):  # Found a potential primary error line
+            if first_error_message is None:  # Capture the first one encountered
                 first_error_message = line.strip()
                 log_excerpt_lines.append(first_error_message)
                 
-                # Try to determine a more specific signature
+                # Try to determine a more specific signature from the first line
                 for keyword, sig in ERROR_SIGNATURES.items():
                     if re.search(keyword, first_error_message, re.IGNORECASE):
                         error_signature = sig
                         break
                 
-                # Now look for the ". l.<number>" line and build the excerpt
-                for j in range(1, min(MAX_EXCERPT_CONTEXT_LINES + 1, len(lines) - i)):
+                # Now collect the full error message and context
+                j = 1
+                while (i + j < len(lines)) and (j <= MAX_EXCERPT_CONTEXT_LINES):
                     context_line = lines[i + j]
-                    log_excerpt_lines.append(context_line.rstrip()) # Add to excerpt
                     
-                    if j <= MAX_LINES_FOR_LINE_NUM_SEARCH:
+                    # Check if this line indicates a line number in the TeX source
+                    if j <= MAX_LINES_FOR_LINE_NUM_SEARCH and error_line_in_tex == "unknown":
                         match_line_num = LINE_NUMBER_PATTERN.match(context_line)
                         if match_line_num:
                             error_line_in_tex = match_line_num.group("line_number")
-                            # Often the line number info is crucial, so we might stop excerpt here or shortly after
-                            # For now, we continue capturing a few more lines for context if available
-
+                    
+                    # Add the line to the excerpt
+                    log_excerpt_lines.append(context_line.rstrip())
+                    
+                    # Check if we should continue collecting context
+                    j += 1
+                    
                     # Heuristic to stop excerpt: blank line, or another "!" error, or end of context lines
-                    if not context_line.strip() or \
+                    if (not context_line.strip() and j > 3) or \
                        (context_line.startswith("! ") and len(log_excerpt_lines) > 1) or \
                        context_line.startswith("Here is how much of TeX's memory") or \
                        context_line.startswith("No pages of output."):
                         break
-                break # Processed the first major error block
+                
+                # After collecting the excerpt, check for specific patterns that indicate a multi-line error
+                full_excerpt = "\n".join(log_excerpt_lines)
+                
+                # Check for mismatched delimiters in the full excerpt
+                if "\\left(" in full_excerpt and "\\right]" in full_excerpt:
+                    error_signature = "LATEX_MISMATCHED_DELIMITERS"
+                elif "Runaway argument" in full_excerpt:
+                    error_signature = "LATEX_RUNAWAY_ARGUMENT"
+                
+                break  # Processed the first major error block
 
     if not first_error_message:
         logger.info("No lines starting with '!' found in the log.")
