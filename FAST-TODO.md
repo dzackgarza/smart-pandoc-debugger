@@ -28,6 +28,45 @@
 - [ ] Work on ONE test at a time
 - [ ] **NO REGRESSIONS** - Passing tests must stay passing
 
+## 🔧 FAST DEBUGGING TECHNIQUES
+
+### 🐛 Quick Debugging Tips
+1. **Use DEBUG=1**
+   - Run tests with `DEBUG=1 ./test X` to see detailed output
+   - Look for error patterns in the debug output
+
+2. **Check Test Output**
+   - The test script shows the exact input being tested
+   - Compare expected vs actual output carefully
+
+3. **Simple Patterns First**
+   - Start with basic regex patterns
+   - Test patterns in isolation before combining
+   - Use online regex testers to verify patterns
+
+4. **Error Message Analysis**
+   - Look for key phrases in error messages
+   - Pay attention to line numbers and context
+   - Check for common LaTeX error patterns
+
+5. **Incremental Testing**
+   - Test small changes one at a time
+   - Use `git stash` to quickly revert changes
+   - Keep a clean working directory
+
+6. **Common Pitfalls**
+   - Escaping special characters in regex
+   - Handling different line endings
+   - Case sensitivity in pattern matching
+   - Whitespace handling in test inputs
+
+7. **When Stuck**
+   - Check the raw LaTeX output in /tmp/
+   - Look at the full error log
+   - Try simplifying the test case further
+   - Take a break and come back with fresh eyes
+
+
 ### 🔥 MVP Development Strategy
 
 #### 1. DEBUGGING FIRST

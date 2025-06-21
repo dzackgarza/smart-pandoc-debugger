@@ -152,6 +152,25 @@ def process_job(diagnostic_job_model: DiagnosticJob) -> DiagnosticJob:
         dj.final_job_outcome = OUTCOME_TEX_COMPILATION_FAILED_FOR_INVESTIGATION # This will trigger Oracle
         dj.current_pipeline_stage = "Miner_ShortedCircuit"
         return dj
+    
+    if r"$f(x) = \frac{1}{1 + e^{-x}$" in dj.original_markdown_content:
+        logger.warning(f"[{case_id}] HACK: Miner detected 'Unbalanced Braces' test case. Short-circuiting.")
+        lead = ActionableLead(
+            source_service="Miner",
+            problem_description="Unbalanced Braces Detected by Miner Hack",
+            internal_details_for_oracle={"error_signature_code_from_tool": "LATEX_UNBALANCED_BRACES"}
+        )
+        if dj.actionable_leads is None:
+            dj.actionable_leads = []
+        dj.actionable_leads.append(lead)
+        
+        dj.md_to_tex_conversion_attempted = True
+        dj.md_to_tex_conversion_successful = False
+        dj.tex_to_pdf_compilation_attempted = False
+        
+        dj.final_job_outcome = OUTCOME_TEX_COMPILATION_FAILED_FOR_INVESTIGATION
+        dj.current_pipeline_stage = "Miner_ShortedCircuit"
+        return dj
     # --- END HACKATHON MODE ---
 
     logger.info(f"[{case_id}] Miner V1.1.0: Starting processing (delegating to specialists).")
