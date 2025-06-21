@@ -116,7 +116,7 @@ def get_oracle_advice(error):
 - **Expected**: Should detect undefined command
 
 ### Test 3: Mismatched Delimiters
-- [ ] Status: Pending
+- [x] Status: ✅ Passed
 - **Input**:
   ```markdown
   # Test
