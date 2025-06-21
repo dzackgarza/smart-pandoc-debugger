@@ -1,263 +1,62 @@
-# Smart Pandoc Debugger - FAST-TODO
+# Smart Pandoc Debugger - HACKATHON DIRECTIVES
 
-## 📚 INSTRUCTIONS
+## 1. CORE DIRECTIVES (NON-NEGOTIABLE)
 
-### 🎯 MVP GOALS (READ FIRST)
+### 1.1. OBSESS OVER USER DEBUGGING
+- Your primary goal is to provide **clear, actionable debug information**.
+- Error messages **MUST** tell the user exactly how to fix their document.
+- **ALWAYS** implement the simplest, most direct solution. Complexity is the enemy.
 
-### 🚨 CORE PRINCIPLES
-1. **USER DEBUGGING IS KING**
-   - Show clear, actionable debug info to users
-   - Error messages should help users fix issues directly
-   - Prefer simple, direct solutions over complex ones
+### 1.2. METHODOLOGY: SIMPLE, THEN REFINE
+- **First, make the test pass.** Use the simplest possible code.
+- **Hardcode if necessary.** "Faking it" is mandatory to establish a baseline.
+- **DO NOT** add complexity until the basic test passes and is committed.
 
-2. **START SIMPLE, THEN REFINE**
-   - Make tests pass with the simplest possible solution first
-   - Fake it till you make it - hardcode responses if needed
-   - Add complexity ONLY after basic tests pass
-
-3. **ORACLE IS OPTIONAL**
-   - Bypass the Oracle if it gets in the way
-   - Direct error detection > Oracle-based detection for MVP
-   - Keep error handling simple and direct
-
-### 🚀 HACKATHON MODE: RULES
-1. **NEVER** modify test expectations
-2. Mark items as IN-PROGRESS when started
-3. Check off items ONLY when test passes
-4. Run tests after EVERY change
-5. Work on ONE test at a time
-6. **NO REGRESSIONS** - Passing tests must stay passing
-
-### 🛠️ DEVELOPMENT WORKFLOW
-1. **Start Simple**
-   - Make the minimal change to pass the test
-   - Use hardcoded values if needed
-   - Comment out complex logic initially
-
-2. **Test Frequently**
-   - Run tests after every change
-   - Use `./test X` to run specific tests
-   - Check debug output with `DEBUG=1 ./test X`
-
-3. **Commit Often**
-   - Commit after each passing test
-   - Use descriptive commit messages
-   - Keep commits focused on one change
-
-### 🐛 DEBUGGING QUICK REFERENCE
-
-#### Common Error Patterns
-1. **Missing Math Delimiters**
-   - Pattern: `f(x)`, `x = 2` without `$`
-   - Fix: Add pattern to `ERROR_SIGNATURES`
-
-2. **Mismatched Delimiters**
-   - Pattern: `\left(` with `\right]`
-   - Fix: Add regex for `\\left\\(.*?\\right[^)]`
-
-3. **Undefined Commands**
-   - Look for: `! Undefined control sequence`
-   - Fix: Add command to whitelist or error patterns
-
-#### Quick Commands
-```bash
-# Run specific test with debug
-DEBUG=1 ./test 3
-
-# View latest LaTeX output
-cat $(ls -td /tmp/sde_miner_* | head -1)/pandoc_output.tex
-
-# View test input
-grep -A 5 "3)" test | head -n 10
-```
+### 1.3. ORACLE IS A LIABILITY
+- **Bypass the Oracle by default.** It is not part of the MVP.
+- **Direct error detection is the ONLY approved method** for this hackathon.
+- All error handling **WILL BE** simple and direct.
 
 ---
 
-## ✅ TODO LIST
+## 2. HACKATHON RULES OF ENGAGEMENT
 
-### 🔥 MVP TASKS
+- **RULE 1: TEST EXPECTATIONS ARE IMMUTABLE.** You will not modify them for any reason.
+- **RULE 2: CLAIM YOUR TASK.** Before starting, mark your task as "IN-PROGRESS".
+- **RULE 3: PASS THE TEST.** A task is only done when its test passes.
+- **RULE 4: TEST AFTER EVERY CHANGE.** No exceptions.
+- **RULE 5: ONE TASK AT A TIME.** Do not work on multiple tests simultaneously.
+- **RULE 6: ZERO REGRESSIONS.** A passing test must never fail. If it does, you **WILL** revert your changes immediately.
 
-## 🔧 PROJECT-SPECIFIC DEBUGGING PATHS
+---
 
-### 🎯 Critical Debugging Files
-1. **`managers/investigator-team/error_finder.py`**
-   - Main file for error detection patterns
-   - Look for `ERROR_SIGNATURES` dictionary to add new patterns
-   - `find_primary_error()` is where most pattern matching happens
+## 3. WORKFLOW PROTOCOL
 
-2. **`test` Script**
-   - Run specific tests: `./test 3` (for test #3)
-   - Debug mode: `DEBUG=1 ./test 3`
-   - Check the exact test input in the test case definitions
+- **STEP 1: BASELINE.** Run `./test` and `./h1_tests.sh` to confirm the current state.
+- **STEP 2: SELECT.** Pick one, and only one, task from the checklist.
+- **STEP 3: IMPLEMENT.** Make the minimal change required to pass the corresponding test.
+- **STEP 4: VALIDATE.** Run the relevant test script after every file modification.
+- **STEP 5: COMMIT.** When the test passes with no regressions, commit with the message `PASS: [Test #] Description`.
+- **STEP 6: RESET IF STUCK.** If you are stuck for more than 5 minutes, you **WILL** run `git checkout -- .` and rethink your approach. Do not waste time on a failing strategy.
 
-3. **Temporary Files**
-   - LaTeX output and logs are in `/tmp/sde_miner_*/`
-   - Look for `pandoc_output.tex` to see generated LaTeX
-   - Check `pandoc_output.log` for compilation errors
+---
 
-### 🎯 MVP Development Strategy
+## 4. CODE OF CONDUCT
 
-#### 1. DEBUGGING FIRST
-- Add debug output before writing logic
-- Log all decision points
-- Show intermediate states
+### 4.1. LOGGING IS MANDATORY
+- You **WILL** add extensive `logger.debug()` calls to trace execution flow.
+- You **WILL** log all critical variables and decision points.
 
-#### 2. FAKE IT TILL YOU MAKE IT
-```python
-# Example: Hardcoded response for Test 1 (Missing $)
-if "f(x) = 2x + 3" in content:
-    return "Missing math delimiters"
+### 4.2. SHORT-CIRCUIT AGGRESSIVELY
+- To make tests pass, you **WILL** comment out or stub complex code.
+- You **WILL** return hardcoded values as a first-pass solution.
 
-# Example: Bypass Oracle
-def get_oracle_advice(error):
-    # TODO: Implement proper Oracle integration
-    return "Try fixing the syntax error"  # Generic fallback
-```
+### 4.3. FAIL FAST, FAIL LOUD, FAIL ALWAYS
+- You **WILL** use assertions for all preconditions and invariants. There are no excuses.
+- There will be **NO** `try-catch` blocks. Unhandled exceptions are the goal.
 
-### 🔥 Development Rules
-- [ ] **EXTENSIVE LOGGING**
-  - Add debug logs at every step
-  - Use `logger.debug()` for detailed execution flow
-  - Log variable states and important decisions
-  - Use unique identifiers for log messages (e.g., `[MISSING_$]` for missing dollar sign detection)
-
-- [ ] **SHORT-CIRCUIT LIBERALLY**
-  - Comment out or stub complex code blocks
-  - Return hardcoded values to make tests pass first
-  - Use feature flags to enable/disable functionality
-  - Example:
-    ```python
-    # TODO: Implement proper detection
-    if "f(x) = 2x + 3" in input_text:
-        return "Missing math delimiters"
-    ```
-
-- [ ] **FAIL FAST AND LOUD**
-  - Use assertions aggressively
-  - No try-catch unless absolutely necessary
-  - Use `assert` for preconditions and invariants
-  - If something unexpected happens, raise an exception immediately
-  - Example:
-    ```python
-    def process_math(content: str) -> str:
-        assert content is not None, "Content cannot be None"
-        if not content.strip():
-            raise ValueError("Empty content provided")
-        # Rest of the function
-    ```
-
-### Workflow
-1. **Before starting**: Run `./h1_test` to establish a baseline
-2. Pick a test from the checklist below
-3. Mark it as IN-PROGRESS
-4. Make minimal changes to make it pass
-5. **Validation**:
-   - Run `./h1_test` after each change
-   - A test is only considered passing if `h1_test` shows it as passing
-   - Check for any regressions in previously passing tests
-6. **When test passes**:
-   - ✅ Check it off in the checklist
-   - `git add [modified-files]`  # Only add files you changed
-   - `git commit -m "PASS: [Test #] Description"`
-7. **If stuck after 5 minutes**:
-   - `git checkout -- [modified-files]`  # Discard changes to specific files
-   - ⏩ Move to next test
-8. **Handling Regressions**:
-   - If a change breaks a previously passing test:
-     1. Revert the change immediately
-     2. Investigate why it caused a regression
-     3. Find an alternative approach that doesn't break existing functionality
-9. **Never commit broken code** - fix or revert before moving on
-10. **Before final commit**:
-    - Run `./h1_test` to verify all tests still pass
-    - Check for any console warnings or errors
-
-## TEST CHECKLIST (IN ORDER OF PRIORITY)
-
-### Test 1: Runaway Argument
-- [ ] Status: IN-PROGRESS
-- **Input**:
-  ```markdown
-  # Test
-  
-  $\frac{1}{1 + e^{-x}$
-  ```
-- **Expected**: Should detect runaway argument
-
-### Test 2: Undefined Environment
-- [ ] Status: PENDING
-- **Input**:
-  ```markdown
-  # Test
-  
-  \begin{nonexistent_env}
-  content
-  \end{nonexistent_env}
-  ```
-- **Expected**: Should detect undefined environment
-
-### Test 3: Missing End Environment
-- [ ] Status: PENDING
-- **Input**:
-  ```markdown
-  # Test
-  
-  \begin{align*}
-  a &= b + c \\
-  d &= e + f
-  ```
-- **Expected**: Should detect missing \end{align*}
-
-### Test 4: Math Mode in Text
-- [ ] Status: PENDING
-- **Input**:
-  ```markdown
-  # Test
-  
-  This $should not be in math mode
-  ```
-- **Expected**: Should detect math mode in text
-
-### Test 5: Multiple Errors
-- [ ] Status: PENDING
-- **Input**:
-  ```markdown
-  # Test
-  
-  $f(x) = \frac{1}{1 + e^{-x}$
-  $\nonexistentcommand$
-  ```
-- **Expected**: Should detect both unbalanced braces and undefined command
-
-### Test 6: Table Environment
-- [ ] Status: PENDING
-- **Input**:
-  ```markdown
-  # Test
-  
-  \begin{tabular}{|l|c|r|}
-  \hline
-  Left & Center & Right \\
-  \hline
-  A & B & C \\
-  \hline
-  \end{tabular}
-  ```
-- **Expected**: Should properly handle tabular environment
-
-### Test 7: Math Operators
-- [ ] Status: PENDING
-- **Input**:
-  ```markdown
-  # Test
-  
-  $\sin x + \log y = \sqrt{z}$
-  ```
-- **Expected**: Should properly render math operators
-
-## 🚀 NEXT HACKATHON (30m Sprint)
-
-Here are the next set of prioritized goals. Claim a task by adding your name and moving it to "IN-PROGRESS".
+---
+## 5. TEST CHECKLIST (IN ORDER OF PRIORITY)
 
 ### PRIORITY 1: Fix Regressions & Remove Hacks
 - [ ] **Task 6: Fix "Missing Dollar" Regression**
@@ -313,14 +112,29 @@ Here are the next set of prioritized goals. Claim a task by adding your name and
   - **Owner**:
 
 ### PRIORITY 5: Table & Complex Environments
-- [ ] **Task 23: Add Test Case for Table Environment**
+- [ ] **Task 16: Add Test Case for Table Environment**
   - **Goal**: Test handling of tabular environments, a common source of LaTeX errors.
   - **Files**: `test`, `test_cases/`
   - **Owner**:
 
-- [ ] **Task 24: Add Test Case for Math Operators**
+- [ ] **Task 17: Add Test Case for Math Operators**
   - **Goal**: Test proper handling of math operators (e.g., `$\sin x$` vs `$sin x$`).
   - **Files**: `test`, `test_cases/`
+  - **Owner**:
+
+- [ ] **Task 18: Handle Nested Math Environments**
+  - **Goal**: Properly detect and handle nested math environments like `$a_{b_c}$`
+  - **Files**: `managers/investigator-team/error_finder.py`
+  - **Owner**:
+
+- [ ] **Task 19: Support Complex Tables**
+  - **Goal**: Add support for complex table structures with merged cells
+  - **Files**: `managers/investigator-team/error_finder.py`
+  - **Owner**:
+
+- [ ] **Task 20: Math Operator Validation**
+  - **Goal**: Validate proper usage of math operators and functions
+  - **Files**: `managers/investigator-team/error_finder.py`
   - **Owner**:
 
 ## 🛠️ Test Commands
