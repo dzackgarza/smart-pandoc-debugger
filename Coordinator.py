@@ -119,6 +119,7 @@ def _invoke_investigator(diagnostic_job: DiagnosticJob) -> DiagnosticJob:
     diagnostic_job.current_pipeline_stage = "Stage_InvestigatorManager"
     logger.info(f"[{diagnostic_job.case_id}] TeX-to-PDF failed. Entering {diagnostic_job.current_pipeline_stage}...")
     diagnostic_job = run_manager(INVESTIGATOR_MANAGER_PATH, diagnostic_job) # UPDATED
+    logger.info(f"[{diagnostic_job.case_id}] Investigator output: {diagnostic_job.actionable_leads}")
     diagnostic_job.final_job_outcome = OUTCOME_TEX_ERROR_REMEDIES
     return diagnostic_job
 

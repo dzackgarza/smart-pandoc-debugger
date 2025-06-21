@@ -1,109 +1,131 @@
 #!/usr/bin/env bash
-# test.sh - SDE V5.1.3 Test Suite
+# test.sh - Smart Pandoc Debugger Test Suite
 #
-# Runs a series of tests in increasing order of complexity to verify
-# individual components and the overall SDE pipeline.
+# Focused test suite for the Smart Pandoc Debugger project.
 #
-# Usage: ./test.sh
-#        DEBUG=true ./test.sh  (for verbose SDE logs)
-#
-# To copy output of all tests:
-#   ./test.sh | wl-copy
-#   DEBUG=true ./test.sh 2>&1 | wl-copy (to include SDE logs and bash xtrace)
-#
+# Usage: ./test           # Run all tests
+#        ./test 1        # Run test 1 (Missing Dollar Sign)
+#        ./test 3 4      # Run tests 3 and 4
+#        DEBUG=1 ./test   # Run with debug output
 
 # Determine SCRIPT_DIR and PROJECT_ROOT relative to this test.sh script
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="${SCRIPT_DIR}" # Assuming test.sh is at the project root
 
 # Path to the main SDE entry point
-# Assumes 'smart-pandoc-debugger' is in the system PATH
-SDE_EXECUTABLE="smart-pandoc-debugger" # <<< --- THIS IS THE CHANGE ---
+SDE_EXECUTABLE="smart-pandoc-debugger"  # Assumes it's in the system PATH
 
-# --- Helper to run a single SDE invocation ---
-# $1: Test Name
-# $2: Input Markdown string
-# $3: Brief description of what this test targets
-run_sde_test() {
-    local test_name="$1"
-    local input_md="$2"
-    local description="$3"
+# --- Helper Functions ---
 
-    echo -e "\n\n--- TEST: ${test_name} ---"
-    echo -e "Description: ${description}"
+die() {
+    echo -e "\033[0;31mERROR: $1\033[0m" >&2
+    exit 1
+}
+
+run_sde() {
+    local input_md="$1"
+    printf '%s' "${input_md}" | "${SDE_EXECUTABLE}" 2>&1
+}
+
+# --- Test Runner ---
+
+run_test() {
+    local test_num="$1"
+    local test_name=""
+    local input_md=""
+    local expected_outcome=""
+    
+    case "$test_num" in
+        1)
+            test_name="Missing Dollar Sign"
+            input_md="# Test\n\nf(x) = 2x + 3"
+            expected_outcome="Missing math delimiters"
+            ;;
+        2)
+            test_name="Undefined Command"
+            input_md="# Test\n\n\$\\\\nonexistentcommand\$"
+            expected_outcome="Undefined control sequence"
+            ;;
+        3)
+            test_name="Mismatched Delimiters"
+            input_md="# Test\n\n\$\$ \\left( \\frac{a}{b} \\right] \$\$"
+            expected_outcome="Mismatched delimiters"
+            ;;
+        4)
+            test_name="Align Environment"
+            input_md="# Align Test\n\n\\\\begin{align*}\na &= b + c \\\\d &= e + f\n\\\\end{align*}"
+            expected_outcome="CompilationSuccess_PDFShouldBeValid"
+            ;;
+        5)
+            test_name="Unbalanced Braces"
+            input_md="# Test\n\n\$f(x) = \\frac{1}{1 + e^{-x}\$"
+            expected_outcome="Unbalanced braces"
+            ;;
+        *)
+            die "Invalid test number: $test_num (must be 1-5)"
+            ;;
+    esac
+    
+    echo -e "\n=== TEST ${test_num}: ${test_name} ==="
     echo -e "Input Markdown:\n${input_md}"
     echo -e "--------------------------------------------------"
-
-    local sde_command_output
-    sde_command_output=$(printf '%s' "${input_md}" | "${SDE_EXECUTABLE}" 2>&1)
-    local sde_exit_status=$?
-
-    echo -e "SDE Output (stdout & stderr, exit status: ${sde_exit_status}):"
-    echo "${sde_command_output}" | sed 's/^/  /'
-    echo -e "--- END TEST: ${test_name} ---\n"
-
-    if echo "${sde_command_output}" | grep -E -q "CRITICAL|AssertionError|Traceback (most recent call last)"; then
-        echo -e "\033[0;31mPOTENTIAL ISSUE DETECTED IN ABOVE TEST (CRITICAL/Assertion/Traceback found).\033[0m"
-    elif [[ ${sde_exit_status} -ne 0 && "${description}" == *"should succeed"* ]]; then
-        echo -e "\033[0;31mPOTENTIAL ISSUE: Test expected success but SDE exited non-zero (${sde_exit_status}).\033[0m"
-    elif [[ ${sde_exit_status} -eq 0 && "${description}" == *"should fail"* && "${sde_command_output}" != *"CompilationSuccess"* ]]; then
-        if echo "${sde_command_output}" | grep -q "NoActionableLeadsFound_ManualReview"; then
-             echo -e "\033[0;33mNOTE: Test expected failure, SDE reported 'NoActionableLeadsFound' (exit 0).\033[0m"
-        elif echo "${sde_command_output}" | grep -qE "MarkdownError_RemediesProvided|TexCompilationError_RemediesProvided"; then
-            echo -e "\033[0;32mNOTE: Test expected failure, SDE reported specific errors (exit 0).\033[0m"
-        else
-            echo -e "\033[0;33mPOTENTIAL ISSUE: Test expected failure, SDE exited 0 but outcome unclear.\033[0m"
-        fi
+    
+    local output
+    output=$(run_sde "${input_md}")
+    local status=$?
+    
+    if [[ "${DEBUG:-0}" == "1" ]]; then
+        echo -e "SDE Output (exit status: ${status}):"
+        echo "${output}" | sed 's/^/  /'
+    fi
+    
+    if echo "${output}" | grep -q "${expected_outcome}"; then
+        echo -e "✅ TEST ${test_num} PASSED: Found '${expected_outcome}'"
+        return 0
+    else
+        echo -e "❌ TEST ${test_num} FAILED: Expected '${expected_outcome}' not found"
+        return 1
     fi
 }
 
-# --- Test Suite ---
+# --- Main ---
 
-echo "======================================================================"
-echo "Starting SDE Test Suite..."
-echo "Target SDE Entry Point: ${SDE_EXECUTABLE} (from PATH)" # Updated log message
-echo "DEBUG mode for SDE is: ${DEBUG:-false}"
-echo "======================================================================"
+main() {
+    # Check if SDE is available
+    if ! command -v "${SDE_EXECUTABLE}" >/dev/null 2>&1; then
+        die "${SDE_EXECUTABLE} not found in PATH"
+    fi
+    
+    echo -e "🚀 Smart Pandoc Debugger Test Suite"
+    echo -e "SDE: $(which ${SDE_EXECUTABLE})"
+    echo -e "DEBUG: ${DEBUG:-0}"
+    echo -e "======================================"
+    
+    local tests_to_run=()
+    local all_passed=0
+    
+    # If no args, run all tests
+    if [[ $# -eq 0 ]]; then
+        tests_to_run=(1 2 3 4 5)
+    else
+        tests_to_run=("$@")
+    fi
+    
+    for test_num in "${tests_to_run[@]}"; do
+        if ! run_test "$test_num"; then
+            all_passed=1
+        fi
+    done
+    
+    echo -e "\n=== SUMMARY ==="
+    if [[ $all_passed -eq 0 ]]; then
+        echo -e "✅ ALL TESTS PASSED"
+    else
+        echo -e "❌ SOME TESTS FAILED"
+    fi
+    
+    return $all_passed
+}
 
-# T0: System Sanity & Simplest Success
-run_sde_test "T0.1: Simplest Valid Markdown" \
-    "# Hello World\n\nThis is a simple paragraph with some inline math: \$E=mc^2\$. And a display math environment:\n\n\$\$ F = ma \$\$" \
-    "(Expectation: Flawless compilation. Outcome: CompilationSuccess_PDFShouldBeValid)"
-
-run_sde_test "T0.2: Markdown with Align Environment" \
-    "# Align Test\n\n\\begin{align*}\na &= b + c \\\\\nd &= e + f\n\\end{align*}" \
-    "(Expectation: Flawless compilation. Outcome: CompilationSuccess_PDFShouldBeValid)"
-
-# T1: MD-to-TeX Conversion Failure (Miner Only)
-run_sde_test "T1.1: Broken Markdown Table (Pandoc MD-to-TeX Fail)" \
-    "| Header 1 | Header 2 |\n|---|---|\n| Cell 1 | \n This should break table structure badly enough for Pandoc error." \
-    "(Expectation: Miner reports MD-to-TeX failure. Outcome: MarkdownError_LeadsProvided. Lead description should mention Pandoc.)"
-
-run_sde_test "T1.2: Invalid Pandoc Option (Simulated Pandoc Fail)" \
-    "# Title\n\n---\nbibliography: non_existent_file.bib\n---\n\nText." \
-    "(Expectation: Miner reports MD-to-TeX failure due to Pandoc error. Outcome: MarkdownError_LeadsProvided. Lead about Pandoc.)"
-
-# T2: TeX Compilation Failure - Simple Error (Miner + Investigator + error_finder)
-run_sde_test "T2.1: Undefined TeX Command" \
-    "# Good Markdown\n\nThis TeX will fail:\n\n\$\\nonexistentcommand\$" \
-    "(Expectation: TeX compile fails. Investigator's error_finder identifies 'Undefined control sequence'. Lead created. Outcome: TexCompilationError_RemediesProvided or NoActionableLeads if error_finder fails.)"
-
-run_sde_test "T2.2: Missing Closing Brace in TeX" \
-    "# Another TeX Fail\n\n\$\\frac{1}{2\$" \
-    "(Expectation: TeX compile fails. error_finder identifies 'Missing } inserted' or similar. Lead created. Outcome: TexCompilationError_RemediesProvided or NoActionableLeads.)"
-
-# T3: TeX Compilation Failure - Seer-Handled Error (Miner + Investigator + error_finder + Oracle + seer)
-run_sde_test "T3.1: Mismatched \\left \\right (Seer)" \
-    "# TeX Error for Seer\n\n\$\$ \\left( \\frac{a}{b} \\right] \$\$" \
-    "(Expectation: TeX compile fails. error_finder gets general error. Oracle calls seer.py. seer.py suggests 'Mismatched brackets'. Remedy created. Report shows lead & remedy.)"
-
-run_sde_test "T3.2: Runaway Argument (Seer)" \
-    "# TeX Error for Seer - Runaway Argument\n\n\\textit{This is an unclosed command..." \
-    "(Expectation: TeX compile fails (likely 'Runaway argument?'). error_finder gets it. Oracle calls seer.py. seer.py suggests 'Possible unclosed environment'. Remedy created.)"
-
-echo "======================================================================"
-echo "SDE Test Suite Finished."
-echo "Review output above for PASS/FAIL based on expectations and SDE behavior."
-echo "NOTE: The 'POTENTIAL ISSUE' lines are basic checks. Detailed verification of"
-echo "the SDE's JSON output or final report summary is needed for true validation."
-echo "======================================================================"
+# Run main with all arguments
+main "$@"

@@ -146,6 +146,10 @@ class MarkdownRemedy(BaseModel):
         description="A confidence score between 0.0 and 1.0 indicating how confident the system is "
                     "that this remedy will fix the issue. Higher values indicate higher confidence."
     )
+    notes: Optional[str] = Field(
+        None,
+        description="Optional notes about this remedy"
+    )
 
 # --- NEW: Specialist Result Models ---
 
