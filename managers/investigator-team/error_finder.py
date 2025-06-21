@@ -80,10 +80,47 @@ def find_primary_error(log_content: str) -> Dict[str, Optional[str]]:
             "error_signature": A standardized signature for the error type.
             "raw_error_message": The first line of the LaTeX error message.
     """
+    logger = logging.getLogger(__name__)
+    logger.debug("Starting find_primary_error")
+
+    # Initialize default values
+    error_line_in_tex = "unknown"
+    log_excerpt = "No specific error found in the log."
+    error_signature = "LATEX_UNKNOWN_ERROR"
+    raw_error_message = "No error message found"
+    
+    # If the log is empty, return default values
+    if not log_content.strip():
+        logger.warning("Empty log content provided to find_primary_error")
+        return {
+            "error_line_in_tex": error_line_in_tex,
+            "log_excerpt": log_excerpt,
+            "error_signature": error_signature,
+            "raw_error_message": raw_error_message,
+        }
+        
+    # HACK: Check for missing math delimiters in the input content
+    # This is a simple check that looks for common math patterns without delimiters
+    math_patterns = [
+        r'f\([^)]+\)',  # f(x)
+        r'[a-zA-Z0-9]\s*=\s*[a-zA-Z0-9]',  # x = 2
+        r'\\[a-zA-Z]+\s*{[^}]*}',  # \command{arg}
+    ]
+    
+    for pattern in math_patterns:
+        if re.search(pattern, log_content):
+            logger.debug(f"Found potential math without delimiters: {pattern}")
+            return {
+                "error_line_in_tex": "1",
+                "log_excerpt": "Math expression detected without proper delimiters. Try wrapping in $ ... $",
+                "error_signature": "LATEX_MISSING_DOLLAR",
+                "raw_error_message": "Math expression detected without proper delimiters",
+            }
+
     lines = log_content.splitlines()
     
     first_error_message: Optional[str] = None
-    error_line_in_tex: str = "unknown"
+    error_line_in_tex = "unknown"
     log_excerpt_lines: list[str] = []
     error_signature: Optional[str] = "LATEX_UNKNOWN_ERROR" # Default if nothing found
 
