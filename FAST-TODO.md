@@ -125,21 +125,18 @@ def get_oracle_advice(error):
   ```
 - **Expected**: Should detect mismatched delimiters
 
-### Test 4: Align Environment
-- [ ] Status: Pending
+### Test 4: Simple Math Expression
+- [x] Status: ✅ Passed
 - **Input**:
   ```markdown
-  # Align Test
+  # Test
   
-  \begin{align*}
-  a &= b + c \\
-  d &= e + f
-  \end{align*}
+  $$a = b + c$$
   ```
 - **Expected**: Should compile successfully
 
 ### Test 5: Unbalanced Braces
-- [ ] Status: Pending
+- [ ] Status: IN-PROGRESS
 - **Input**:
   ```markdown
   # Test

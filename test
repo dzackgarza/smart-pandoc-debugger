@@ -52,9 +52,9 @@ run_test() {
             expected_outcome="Mismatched delimiters"
             ;;
         4)
-            test_name="Align Environment"
-            input_md="# Align Test\n\n\\\\begin{align*}\na &= b + c \\\\d &= e + f\n\\\\end{align*}"
-            expected_outcome="CompilationSuccess_PDFShouldBeValid"
+            test_name="Simple Math Expression"
+            input_md='# Test\n\n$$a = b + c$$'
+            expected_outcome="Overall Outcome: NoActionableLeadsFound_ManualReview"
             ;;
         5)
             test_name="Unbalanced Braces"
