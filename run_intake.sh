@@ -9,4 +9,4 @@ if [[ ! -f intake.py ]]; then
 fi
 
 # Capture all stdin and pipe it to intake.py
-python3 intake.py
+exec python3 intake.py
