@@ -66,22 +66,30 @@ def consult_the_oracle(diagnostic_job: DiagnosticJob) -> DiagnosticJob:
         logger.info(f"[{diagnostic_job.case_id}] Oracle: Processing lead {lead.lead_id} with signature: {error_signature}")
 
         remedy_explanation = None
+        instruction_for_fix = None
         # This maps the signature from error_finder.py to the expected test output
         if error_signature == "LATEX_MISSING_DOLLAR":
             remedy_explanation = "Missing math delimiters"
+            instruction_for_fix = "Check for math expressions that are not enclosed in '$...$' or '$$...$$'."
         elif error_signature == "LATEX_UNDEFINED_CONTROL_SEQUENCE":
             remedy_explanation = "Undefined control sequence"
+            instruction_for_fix = "This error means you used a LaTeX command (like \\this) that isn't defined. Check for typos in the command name or ensure the necessary package is included in your Pandoc template or metadata."
         elif error_signature == "LATEX_MISMATCHED_DELIMITERS":
             remedy_explanation = "Mismatched delimiters"
-        elif error_signature in ["LATEX_TOO_MANY_CLOSING_BRACES", "LATEX_EXTRA_BRACE_OR_FORGOTTEN_DOLLAR", "LATEX_UNEXPECTED_PARAGRAPH_END"]:
+            instruction_for_fix = "You have a mismatch in paired delimiters like parentheses, brackets, or braces. For example, using '\\left(' with '\\right]' instead of '\\right)'. Check your math expressions for these mismatches."
+        elif error_signature == "LATEX_RUNAWAY_ARGUMENT":
+            remedy_explanation = "Runaway argument?"
+            instruction_for_fix = "This error usually means you have a command with a missing closing brace '}'. LaTeX reads until the end of the file looking for it. Find the command and add the closing brace."
+        elif error_signature in ["LATEX_TOO_MANY_CLOSING_BRACES", "LATEX_EXTRA_BRACE_OR_FORGOTTEN_DOLLAR", "LATEX_UNEXPECTED_PARAGRAPH_END", "LATEX_UNBALANCED_BRACES"]:
             remedy_explanation = "Unbalanced braces"
+            instruction_for_fix = "You have an unequal number of opening and closing curly braces '{' and '}'. Check your document for LaTeX commands or math expressions where you may have forgotten a brace or added an extra one."
         
         if remedy_explanation:
             remedy = MarkdownRemedy(
                 applies_to_lead_id=lead.lead_id,
                 source_service="OracleManager_HackathonMode",
                 explanation=f"A '{remedy_explanation}' error was detected. This is a common issue when compiling LaTeX.",
-                instruction_for_markdown_fix=f"Please check your Markdown file for the '{remedy_explanation}' error. For example, ensure all math environments are properly enclosed in '$' or '$$' and that all brackets and braces are correctly paired.",
+                instruction_for_markdown_fix=instruction_for_fix or f"Please check your Markdown file for the '{remedy_explanation}' error. For example, ensure all math environments are properly enclosed in '$' or '$$' and that all brackets and braces are correctly paired.",
                 markdown_context_to_change=None,
                 suggested_markdown_after_fix=None,
                 confidence_score=0.99,

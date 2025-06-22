@@ -43,8 +43,14 @@ run_test() {
            input_md="# Align Test\n\n\\begin{align*}\na &= b + c \\\\\nd &= e + f\n\\end{align*}"
            expected_outcome="CompilationSuccess_PDFShouldBeValid" ;;
         5) test_name="Unbalanced Braces"
-           input_md="# Test\n\n\$f(x) = \\frac{1}{1 + e^{-x}}\$"
+           input_md="# Test\n\n\$f({x)\$"
            expected_outcome="Unbalanced braces" ;;
+        6) test_name="Runaway Argument"
+           input_md="# Test\n\n\$\\frac{1{2}\$"
+           expected_outcome="Runaway argument?" ;;
+        7) test_name="Undefined Environment"
+           input_md="# Test\n\n$\\nonexistentenv$"
+           expected_outcome="Undefined control sequence" ;;
         *) echo "ERROR: Invalid test number: $test_num" >&2; return 2 ;;
     esac
     
@@ -81,7 +87,7 @@ main() {
     local failed_tests=()
     
     if [[ $# -eq 0 ]]; then
-        tests_to_run=(1 2 3 4 5)
+        tests_to_run=(1 2 3 4 5 6 7)
     else
         tests_to_run=("$@")
     fi

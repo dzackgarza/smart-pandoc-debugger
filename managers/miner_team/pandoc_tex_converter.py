@@ -21,6 +21,7 @@ import logging
 import pathlib
 import subprocess # For specific exception types
 from typing import List, Optional, NamedTuple, Dict, Any # Removed Tuple as not directly used
+import tempfile
 
 # SDE utilities (expected to be on PYTHONPATH)
 from utils.data_model import ActionableLead, SourceContextSnippet # type: ignore

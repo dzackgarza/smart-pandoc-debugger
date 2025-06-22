@@ -61,6 +61,7 @@ try:
     from utils.data_model import PandocConversionResult, TexCompilationResult # type: ignore
     SPECIALISTS_IMPORTED = True
 except ImportError as e:
+    print("MINER: IMPORT ERROR CAUGHT!")
     logging.critical(f"CRITICAL MINER ERROR: Failed to import specialist modules or their result types. Error: {e}", exc_info=True)
     SPECIALISTS_IMPORTED = False
     # Define dummy functions if imports fail, to allow script parsing but ensure failure at runtime
@@ -130,48 +131,6 @@ def process_job(diagnostic_job_model: DiagnosticJob) -> DiagnosticJob:
     assert isinstance(diagnostic_job_model, DiagnosticJob), "Input must be a DiagnosticJob Pydantic model."
     dj = diagnostic_job_model
     case_id = dj.case_id
-
-    # --- HACKATHON MODE SHORT-CIRCUIT ---
-    # Check for specific test case content to bypass full processing
-    if r"$$ \left( \frac{a}{b} \right] $$" in dj.original_markdown_content:
-        logger.warning(f"[{case_id}] HACK: Miner detected 'Mismatched Delimiters' test case. Short-circuiting.")
-        lead = ActionableLead(
-            source_service="Miner",
-            problem_description="Mismatched Delimiters Detected by Miner Hack",
-            internal_details_for_oracle={"error_signature_code_from_tool": "LATEX_MISMATCHED_DELIMITERS"}
-        )
-        if dj.actionable_leads is None:
-            dj.actionable_leads = []
-        dj.actionable_leads.append(lead)
-        
-        # Set flags to satisfy Coordinator assertions
-        dj.md_to_tex_conversion_attempted = True
-        dj.md_to_tex_conversion_successful = False # Since we are faking a TeX failure
-        dj.tex_to_pdf_compilation_attempted = False # We never get this far
-        
-        dj.final_job_outcome = OUTCOME_TEX_COMPILATION_FAILED_FOR_INVESTIGATION # This will trigger Oracle
-        dj.current_pipeline_stage = "Miner_ShortedCircuit"
-        return dj
-    
-    if r"$f(x) = \frac{1}{1 + e^{-x}$" in dj.original_markdown_content:
-        logger.warning(f"[{case_id}] HACK: Miner detected 'Unbalanced Braces' test case. Short-circuiting.")
-        lead = ActionableLead(
-            source_service="Miner",
-            problem_description="Unbalanced Braces Detected by Miner Hack",
-            internal_details_for_oracle={"error_signature_code_from_tool": "LATEX_UNBALANCED_BRACES"}
-        )
-        if dj.actionable_leads is None:
-            dj.actionable_leads = []
-        dj.actionable_leads.append(lead)
-        
-        dj.md_to_tex_conversion_attempted = True
-        dj.md_to_tex_conversion_successful = False
-        dj.tex_to_pdf_compilation_attempted = False
-        
-        dj.final_job_outcome = OUTCOME_TEX_COMPILATION_FAILED_FOR_INVESTIGATION
-        dj.current_pipeline_stage = "Miner_ShortedCircuit"
-        return dj
-    # --- END HACKATHON MODE ---
 
     logger.info(f"[{case_id}] Miner V1.1.0: Starting processing (delegating to specialists).")
     dj.current_pipeline_stage = "Miner_Initializing"
@@ -265,6 +224,11 @@ def process_job(diagnostic_job_model: DiagnosticJob) -> DiagnosticJob:
 
         dj.tex_to_pdf_compilation_successful = tex_comp_result.compilation_successful
         dj.tex_compiler_raw_log = tex_comp_result.tex_compiler_raw_log
+
+        # --- DEBUG LOGGING ---
+        if not tex_comp_result.compilation_successful and tex_comp_result.tex_compiler_raw_log:
+            logger.warning(f"[{case_id}] Miner: TeX compilation failed. Full log:\n{tex_comp_result.tex_compiler_raw_log}")
+        # --- END DEBUG LOGGING ---
         
         # If tex_compiler had a tool failure (e.g., pdflatex not found/timeout), its actionable_lead would be set.
         if tex_comp_result.actionable_lead:

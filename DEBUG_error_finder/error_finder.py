@@ -47,23 +47,56 @@ LATEX_ERROR_PATTERN = re.compile(
 )
 LINE_NUMBER_PATTERN = re.compile(r"^\.\s*l\.(?P<line_number>\d+)\s*(?P<line_content>.*)")
 
-# Common error signatures based on keywords. Order can matter if messages are generic.
+# Common error signatures based on keywords. Order matters - more specific patterns should come first.
 ERROR_SIGNATURES = {
-    "Undefined control sequence": "LATEX_UNDEFINED_CONTROL_SEQUENCE",
-    "Missing $ inserted": "LATEX_MISSING_DOLLAR",
-    "Extra }, or forgotten \\$": "LATEX_UNBALANCED_BRACES",
-    "Misplaced alignment tab character &": "LATEX_MISPLACED_ALIGNMENT_TAB",
-    "Environment(.*)undefined": "LATEX_UNDEFINED_ENVIRONMENT",
-    "Too many }'s": "LATEX_TOO_MANY_CLOSING_BRACES",
-    "File(.*)not found": "LATEX_FILE_NOT_FOUND",
-    "Missing \\begin{document}": "LATEX_MISSING_BEGIN_DOCUMENT",
-    "Missing number, treated as zero": "LATEX_MISSING_NUMBER",
-    "Illegal unit of measure": "LATEX_ILLEGAL_UNIT",
-    "Paragraph ended before (.*) was complete": "LATEX_UNEXPECTED_PARAGRAPH_END",
-    "Runaway argument?": "LATEX_RUNAWAY_ARGUMENT",
-    # Add more specific patterns as needed
-    "LaTeX Error": "LATEX_GENERIC_ERROR", # Fallback for other LaTeX errors
-    "\\left(.*?\\right]": "LATEX_MISMATCHED_DELIMITERS" # Hack for specific test case
+    # Success and output - must be first
+    r'Output written on .*': 'LATEX_COMPILATION_SUCCESS',
+    r'No pages of output': 'LATEX_NO_OUTPUT_GENERATED',
+    
+    # Math mode errors
+    r'Missing \$ inserted': 'LATEX_MISSING_MATH_DELIMITERS',
+    r'Display math should end with \$': 'LATEX_MISSING_MATH_DELIMITERS',
+    r'Extra \}, or forgotten \$': 'LATEX_UNBALANCED_BRACES',
+    r'Missing \$': 'LATEX_MISSING_MATH_DELIMITERS',
+    r'\\left\\.\\.\\right\\]': 'LATEX_MISMATCHED_DELIMITERS',
+    r'Missing \\right\\.': 'LATEX_MISMATCHED_DELIMITERS',
+    r'Missing \\left\\.': 'LATEX_MISMATCHED_DELIMITERS',
+    r'Misplaced alignment tab character &': 'LATEX_MISPLACED_ALIGNMENT_TAB',
+    
+    # Control sequences and commands
+    r'Undefined control sequence': 'LATEX_UNDEFINED_CONTROL_SEQUENCE',
+    r'Command .* already defined': 'LATEX_COMMAND_ALREADY_DEFINED',
+    r'Command .* undefined': 'LATEX_UNDEFINED_COMMAND',
+    r'Missing \\begin\{document\}': 'LATEX_MISSING_BEGIN_DOCUMENT',
+    r'Missing \\endcsname': 'LATEX_MISSING_ENDCSNAME',
+    r'Extra \\endcsname': 'LATEX_EXTRA_ENDCSNAME',
+    r'Missing number, treated as zero': 'LATEX_MISSING_NUMBER',
+    r'Illegal unit of measure': 'LATEX_ILLEGAL_UNIT',
+    r'Paragraph ended before .* was complete': 'LATEX_UNEXPECTED_PARAGRAPH_END',
+    r'Runaway argument': 'LATEX_RUNAWAY_ARGUMENT',
+    
+    # File and package related
+    r'File `.*\'': 'LATEX_FILE_NOT_FOUND',
+    r'I can\'t find file `.*\'': 'LATEX_FILE_NOT_FOUND',
+    r'LaTeX Error: File `.*\'': 'LATEX_FILE_NOT_FOUND',
+    r'LaTeX Error: Missing \\begin\{document\}': 'LATEX_MISSING_BEGIN_DOCUMENT',
+    r'LaTeX Error: Can be used only in preamble': 'LATEX_PREAMBLE_ONLY_COMMAND',
+    r'LaTeX Error: Missing documentclass': 'LATEX_MISSING_DOCUMENTCLASS',
+    r'LaTeX Error: Command .* already defined': 'LATEX_COMMAND_ALREADY_DEFINED',
+    r'LaTeX Error: Command .* undefined': 'LATEX_UNDEFINED_COMMAND',
+    r'LaTeX Error: Environment .* undefined': 'LATEX_UNDEFINED_ENVIRONMENT',
+    r'LaTeX Error: Can be used only in math mode': 'LATEX_MATH_MODE_REQUIRED',
+    
+    # Document structure
+    r'Too many \}s': 'LATEX_TOO_MANY_CLOSING_BRACES',
+    r'\\begin\{.*\} on input line .* ended by \\end': 'LATEX_ENVIRONMENT_END_MISMATCH',
+    r'\\begin\{.*\} ended by \\end\{.*\}': 'LATEX_ENVIRONMENT_MISMATCH',
+    r'\\begin\{.*\} ended by \\end\{document\}': 'LATEX_ENVIRONMENT_NOT_CLOSED',
+    r'Missing \\end': 'LATEX_MISSING_END',
+    
+    # Fallback patterns (should be last)
+    r'LaTeX Error': 'LATEX_GENERIC_ERROR',
+    r'^!': 'LATEX_GENERIC_ERROR'
 }
 
 
@@ -87,7 +120,7 @@ def find_primary_error(log_content: str) -> Dict[str, Optional[str]]:
     # Initialize default values
     error_line_in_tex = "unknown"
     log_excerpt = "No specific error found in the log."
-    error_signature = "LATEX_UNKNOWN_ERROR"
+    error_signature = "LATEX_NO_ERROR_MESSAGE_IDENTIFIED"
     raw_error_message = "No error message found"
     
     if not log_content.strip():
@@ -98,40 +131,24 @@ def find_primary_error(log_content: str) -> Dict[str, Optional[str]]:
             "error_signature": error_signature,
             "raw_error_message": raw_error_message,
         }
-        
-    # HACK: Prioritize specific, hardcoded checks for test cases.
-    if "Extra }, or forgotten $" in log_content:
-        return {
-            "error_line_in_tex": "unknown", # Could be improved later
-            "log_excerpt": "Log indicates extra '}' or a forgotten '$'.",
-            "error_signature": "LATEX_UNBALANCED_BRACES",
-            "raw_error_message": "Extra }, or forgotten $"
-        }
 
     lines = log_content.splitlines()
     
-    first_error_message: Optional[str] = None
-    error_line_in_tex = "unknown"
-    log_excerpt_lines: list[str] = []
-    error_signature: Optional[str] = "LATEX_UNKNOWN_ERROR" # Default if nothing found
+    first_error_message = None
+    log_excerpt_lines = []
 
     # Max lines to capture for an excerpt after the initial "!" line
-    MAX_EXCERPT_CONTEXT_LINES = 20  # Increased to capture more context
+    MAX_EXCERPT_CONTEXT_LINES = 20
     # Max lines to search for ". l.<num>" after an "!" line
-    MAX_LINES_FOR_LINE_NUM_SEARCH = 10  # Increased to find line numbers in longer error messages
+    MAX_LINES_FOR_LINE_NUM_SEARCH = 10
 
     # First, try to find the error message and its context
     for i, line in enumerate(lines):
         if line.startswith("! "):  # Found a potential primary error line
             if first_error_message is None:  # Capture the first one encountered
-                first_error_message = line.strip()
-                log_excerpt_lines.append(first_error_message)
-                
-                # Try to determine a more specific signature from the first line
-                for keyword, sig in ERROR_SIGNATURES.items():
-                    if re.search(keyword, first_error_message, re.IGNORECASE):
-                        error_signature = sig
-                        break
+                first_error_message = line[2:].strip()  # Remove the leading "! "
+                raw_error_message = first_error_message
+                log_excerpt_lines.append(line)
                 
                 # Now collect the full error message and context
                 j = 1
@@ -145,7 +162,7 @@ def find_primary_error(log_content: str) -> Dict[str, Optional[str]]:
                             error_line_in_tex = match_line_num.group("line_number")
                     
                     # Add the line to the excerpt
-                    log_excerpt_lines.append(context_line.rstrip())
+                    log_excerpt_lines.append(context_line)
                     
                     # Check if we should continue collecting context
                     j += 1
@@ -157,13 +174,34 @@ def find_primary_error(log_content: str) -> Dict[str, Optional[str]]:
                        context_line.startswith("No pages of output."):
                         break
                 
-                # After collecting the excerpt, check for specific patterns that indicate a multi-line error
+                # After collecting the excerpt, check for specific patterns
                 full_excerpt = "\n".join(log_excerpt_lines)
                 
-                # Check for mismatched delimiters in the full excerpt
+                # Set default signature in case no pattern matches
+                error_signature = "LATEX_NO_ERROR_MESSAGE_IDENTIFIED"
+                
+                # Check all patterns in order of specificity
+                for pattern, sig in ERROR_SIGNATURES.items():
+                    if re.search(pattern, full_excerpt, re.IGNORECASE | re.DOTALL):
+                        error_signature = sig
+                        break
+                        
+                # Special case for compilation success
+                if "Output written on" in full_excerpt and not any(
+                    err in full_excerpt for err in ["error", "Error", "ERROR"]
+                ):
+                    error_signature = "LATEX_COMPILATION_SUCCESS"
+                
+                # Special case for missing end
+                if "Missing \\end" in full_excerpt:
+                    error_signature = "LATEX_MISSING_END"
+                
+                # Special case for mismatched delimiters
                 if "\\left(" in full_excerpt and "\\right]" in full_excerpt:
                     error_signature = "LATEX_MISMATCHED_DELIMITERS"
-                elif "Runaway argument" in full_excerpt:
+                
+                # Special case for runaway arguments
+                if "Runaway argument" in full_excerpt:
                     error_signature = "LATEX_RUNAWAY_ARGUMENT"
                 
                 # HACK: Skip math delimiter check if we're in an align environment

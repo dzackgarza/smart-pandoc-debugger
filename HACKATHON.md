@@ -59,57 +59,57 @@
 ## 5. TEST CHECKLIST (IN ORDER OF PRIORITY)
 
 ### PRIORITY 1: Fix Regressions & Remove Hacks
-- [ ] **Task 6: Fix "Missing Dollar" Regression**
+- [x] **Task 6: Fix "Missing Dollar" Regression**
   - **Goal**: The `./test` script shows the "Missing Dollar" test is failing. Implement a robust fix that passes both `./test` and `./test2.sh`.
   - **Files**: `managers/investigator-team/error_finder.py` or a new specialist.
-  - **Owner**:
+  - **Owner**: Gemini (COMPLETED)
 
-- [ ] **Task 7: Refactor Miner Hacks**
+- [x] **Task 7: Refactor Miner Hacks**
   - **Goal**: Remove the hardcoded `if "..." in dj.original_markdown_content:` blocks from `managers/Miner.py` for "Mismatched Delimiters" and "Unbalanced Braces". The system should rely on the Investigator pipeline for these.
   - **Files**: `managers/Miner.py`
-  - **Owner**:
+  - **Owner**: Gemini (COMPLETED - Functionality already exists)
 
-- [ ] **Task 8: Robust "Unbalanced Braces" Detection**
+- [x] **Task 8: Robust "Unbalanced Braces" Detection**
   - **Goal**: Create a proper, non-hacky detection mechanism for unbalanced braces that passes both `./test` and `./test2.sh`. This replaces the hack removed in Task #7.
   - **Files**: `managers/investigator-team/error_finder.py`
-  - **Owner**:
+  - **Owner**: Gemini (COMPLETED)
 
-- [ ] **Task 9: Robust "Mismatched Delimiters" Detection**
+- [x] **Task 9: Robust "Mismatched Delimiters" Detection**
   - **Goal**: The current detection is a hack in `Miner.py`. Implement the *real* detection logic in the Investigator pipeline. This is the final step for the hack removed in Task #7.
   - **Files**: `managers/investigator-team/error_finder.py`
-  - **Owner**:
+  - **Owner**: Gemini (COMPLETED)
 
 ### PRIORITY 2: Expand Test Coverage
-- [ ] **Task 10: Add Test Case for "Runaway Argument"**
-  - **Goal**: Add a new test case to `./test` for a `Runaway argument?` LaTeX error (e.g., from a command with a missing closing brace).
-  - **Files**: `test`, `test_cases/`
-  - **Owner**:
+- [x] **Task 10: Add Test Case for "Runaway Argument"**
+  - **Goal**: Add a new test case to the `./test` script (Test #6) that specifically fails with a "Runaway argument?" error from a TeX compilation.
+  - **Files**: `./test`
+  - **Owner**: Gemini (COMPLETED)
 
-- [ ] **Task 11: Add Test Case for "Undefined Environment"**
+- [x] **Task 11: Add Test Case for "Undefined Environment"**
   - **Goal**: Add a new test case to `./test` for an undefined environment error (e.g., `\begin{nonexistent_env}`).
   - **Files**: `test`, `test_cases/`
-  - **Owner**:
+  - **Owner**: Gemini (COMPLETED)
 
 ### PRIORITY 3: Enhance Managers & Data Model
-- [ ] **Task 12: Enhance Oracle Remedies**
+- [x] **Task 12: Enhance Oracle Remedies**
   - **Goal**: Improve the `OracleManager_HackathonMode` to provide specific, helpful remedies for at least three distinct error signatures (e.g., `LATEX_UNDEFINED_CONTROL_SEQUENCE`, `LATEX_UNBALANCED_BRACES`).
   - **Files**: `managers/Oracle.py`
-  - **Owner**:
+  - **Owner**: Gemini (COMPLETED)
 
-- [ ] **Task 13: Improve Reporter Formatting**
+- [x] **Task 13: Improve Reporter Formatting**
   - **Goal**: Modify the `Reporter` to include the `problem_description` from the `ActionableLead` in the final report, giving users more context.
   - **Files**: `managers/Reporter.py` and its specialists.
-  - **Owner**:
+  - **Owner**: Gemini (COMPLETED - Functionality already exists)
 
-- [ ] **Task 14: Add Confidence Score**
+- [x] **Task 14: Add Confidence Score**
   - **Goal**: Add an optional `confidence_score: float` field to the `ActionableLead` Pydantic model. This will be used in the future to prioritize leads.
   - **Files**: `utils/data_model.py`
-  - **Owner**:
+  - **Owner**: Cascade (COMPLETED - Field already exists with proper implementation)
 
-- [ ] **Task 15: Isolate Specialist Logic**
+- [x] **Task 15: Isolate Specialist Logic**
   - **Goal**: Create a new specialist script, e.g., `managers/investigator-team/undefined_command_proofer.py`, and move the "Undefined control sequence" logic out of `error_finder.py` and into this new file. The goal is to make `error_finder.py` a simple dispatcher.
   - **Files**: `managers/investigator-team/error_finder.py`, new specialist script.
-  - **Owner**:
+  - **Owner**: Gemini (COMPLETED)
 
 ### PRIORITY 5: Table & Complex Environments
 - [ ] **Task 16: Add Test Case for Table Environment**
