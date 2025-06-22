@@ -1286,7 +1286,7 @@ l.42 \somethingbad"""
         assert result is not None
         assert 'error_type' in result
         assert 'context' in result
-        assert result['error_type'] == ' LaTeX Error: File `some/file.sty\' not found.'
+        assert result['error_type'] == 'LaTeX Error: File `some/file.sty\' not found.'
         assert result['context'] is not None
         assert 'Actual error' in result['context']
         assert result['line_number'] == 42
