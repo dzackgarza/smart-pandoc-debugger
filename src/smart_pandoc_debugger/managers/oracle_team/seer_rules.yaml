@@ -1,0 +1,57 @@
+- name: "MismatchedDelimiters"
+  description: "Detects undefined control sequence errors caused by mismatched delimiters"
+  match_type: "regex"
+  pattern: "Undefined control sequence.*\\\\left\\(.*\\\\right"
+  message: "Mismatched delimiters detected (e.g., '\\left(' with '\\right]'). Ensure that delimiters match (e.g., '\\left(' should pair with '\\right)'). Check near line %%ERROR_LINE%% of the generated TeX file."
+  confidence: 0.9
+  origin_tag: "seer::mismatched_delimiters"
+
+- name: "MismatchedBrackets"
+  description: "Detects mismatched \\left vs \\right constructs."
+  match_type: "regex" # or "string" for simple fixed string search
+  pattern: "Mismatch between \\\\left" # Double escaped backslash for YAML, will be single for grep
+  message: "Mismatched brackets detected (e.g. '\\left[' vs '\\right)'). Verify paired delimiters. Potential issue near line %%ERROR_LINE%% of the generated TeX file."
+  confidence: 0.9
+  origin_tag: "seer::brackets"
+
+- name: "UnclosedEnvironmentOrRunawayArg"
+  description: "Detects 'Runaway argument?' which often implies unclosed environments."
+  match_type: "regex" # Could be string if "Runaway argument?" is always exact
+  pattern: "Runaway argument\\?" # "?" needs to be escaped for grep regex
+  message: "Possible unclosed environment detected or a command missing its argument(s). This might be due to a missing '\\end{...}' or an incomplete command structure near line %%ERROR_LINE%% of the generated TeX file."
+  confidence: 0.85
+  origin_tag: "seer::env_unclosed_or_runaway_arg"
+
+- name: "ExtraDollar"
+  description: "Detects 'Extra $' which can mean nested or unclosed inline math."
+  match_type: "string" # "Extra $" is a fixed string
+  pattern: "Extra $"
+  message: "An 'Extra $' was reported by LaTeX. This often indicates nested or unclosed inline math delimiters ('$...$') or a typo. Check math environments near line %%ERROR_LINE%% of the generated TeX file."
+  confidence: 0.85
+  origin_tag: "seer::dollar_extra"
+
+- name: "MissingBackslashOrCmdPart"
+  description: "Detects 'Missing \\' which can mean various issues."
+  match_type: "regex" # "Missing \" is fairly specific but could be string
+  pattern: "Missing \\\\" # Double escaped for YAML -> single for grep
+  message: "LaTeX reported 'Missing \\'. This might mean a stray backslash, an incomplete command, or a missing character after a control sequence. Review content near line %%ERROR_LINE%% of the generated TeX file."
+  confidence: 0.8
+  origin_tag: "seer::missing_backslash_or_cmd_part"
+
+- name: "EnvironmentMismatch"
+  description: "Detects specific environment mismatches like 'Environment X ended by \\end{Y}'."
+  match_type: "regex" # Needs regex to capture the general pattern
+  pattern: "Environment .* ended by \\\\end" # ".*" is the wildcard part
+  message: "LaTeX reported an environment mismatch, like 'Environment X ended by \\end{Y}'. Check your \\begin{...} and \\end{...} pairings near line %%ERROR_LINE%% of the generated TeX file."
+  confidence: 0.9
+  origin_tag: "seer::env_mismatch"
+
+- name: "InvalidUTF8"
+  description: "Detects 'Invalid UTF-8' errors from LaTeX."
+  match_type: "string"
+  pattern: "Invalid UTF-8"
+  message: "Invalid UTF-8 byte sequence detected by LaTeX. This means there are corrupted characters in your source file (likely the original Markdown). Check the encoding of your document or look for unusual symbols, especially near where line %%ERROR_LINE%% (of the TeX file) would originate."
+  confidence: 0.95
+  origin_tag: "seer::utf8_error"
+
+# Add more rules here

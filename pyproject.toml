@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "smart-pandoc-debugger"
-version = "0.1.0"
+version = "0.0.0"
 description = "A tool for debugging Pandoc and LaTeX errors"
 readme = "readme.md"
 requires-python = ">=3.8"
@@ -21,7 +21,6 @@ test = [
     "pytest-xdist>=3.0.0",
     "coverage>=6.0.0",
 ]
-
 dev = [
     "black>=22.0.0",
     "isort>=5.0.0",
@@ -29,6 +28,9 @@ dev = [
     "mypy>=0.910",
     "pylint>=2.12.0",
 ]
+
+[project.scripts]
+spd = "smart_pandoc_debugger.main:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
