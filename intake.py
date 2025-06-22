@@ -90,7 +90,10 @@ import json
 import uuid
 import subprocess
 import pathlib
-import datetime
+import tempfile
+
+# SDE-Kit imports
+from utils.data_model import DiagnosticJob
 
 # --- Configuration ---
 ROOT_DIR = pathlib.Path(__file__).resolve().parent
@@ -107,9 +110,7 @@ def main():
     is_debug_mode = os.environ.get("DEBUG", "false").lower() == "true"
 
     if is_debug_mode:
-        eprint(f"DEBUG INTAKE.PY (SDE V5.1): DEBUG mode ENABLED.")
-        eprint(f"DEBUG INTAKE.PY: Project ROOT_DIR resolved to '{ROOT_DIR}'.")
-        eprint(f"DEBUG INTAKE.PY: Expecting Coordinator script at '{Coordinator_PY_SCRIPT}'.")
+        eprint(f"DEBUG INTAKE.PY: DEBUG mode ENABLED.")
 
     # 1. Read Markdown from stdin
     markdown_content = sys.stdin.read()
@@ -117,95 +118,69 @@ def main():
         eprint("Error (intake.py): No Markdown content received on stdin.")
         sys.exit(2)
 
-    if is_debug_mode:
-        eprint(f"DEBUG INTAKE.PY: Read {len(markdown_content)} chars of Markdown content.")
+    # Create a temporary directory for this job's artifacts
+    with tempfile.TemporaryDirectory(prefix="sde_job_") as temp_dir_str:
+        # WARNING: The 'work_dir' created here is temporary and will be
+        # automatically deleted when this 'with' block is exited.
+        # This means that any file paths stored in the final DiagnosticJob
+        # object (e.g., generated_tex_path) will be invalid and point to
+        # non-existent files after this script completes. This is by design
+        # for a single-run diagnostic, but is critical to understand.
+        work_dir = pathlib.Path(temp_dir_str)
+        if is_debug_mode:
+            eprint(f"DEBUG INTAKE.PY: Created working directory: {work_dir}")
 
-    # 2. Generate case ID and timestamp
-    case_id = str(uuid.uuid4())
-    timestamp_created = datetime.datetime.now(datetime.timezone.utc).isoformat() + "Z"
+        # Write the received markdown to a file in the work_dir
+        markdown_file_path = work_dir / "input.md"
+        markdown_file_path.write_text(markdown_content, encoding="utf-8")
+        if is_debug_mode:
+            eprint(f"DEBUG INTAKE.PY: Wrote markdown to {markdown_file_path}")
 
-    if is_debug_mode:
-        eprint(f"DEBUG INTAKE.PY: Generated case_id: {case_id}")
-        eprint(f"DEBUG INTAKE.PY: Generated timestamp_created: {timestamp_created}")
+        # 3. Construct Initial DiagnosticJob
+        initial_job = DiagnosticJob(original_markdown_path=str(markdown_file_path))
+        initial_job_json = initial_job.model_dump_json()
 
-    # 3. Construct Initial DiagnosticJob JSON
-    #    This structure aligns with the SDE V5.1 `DiagnosticJob` Pydantic model.
-    initial_diagnostic_job = {
-        "case_id": case_id,
-        "timestamp_created": timestamp_created,
-        "original_markdown_content": markdown_content,
-        "md_to_tex_conversion_attempted": False,
-        "md_to_tex_conversion_successful": False,
-        "md_to_tex_raw_log": None,
-        "generated_tex_content": None,
-        "tex_to_pdf_compilation_attempted": False,
-        "tex_to_pdf_compilation_successful": False,
-        "tex_compiler_raw_log": None,
-        "actionable_leads": [],
-        "markdown_remedies": [],
-        "current_pipeline_stage": "pending_coordination", # Stage after intake, before Coordinator starts
-        "final_job_outcome": None,
-        "final_user_report_summary": None,
-        "internal_tool_outputs_verbatim": {}
-    }
-    initial_diagnostic_job_json = json.dumps(initial_diagnostic_job) # indent=2 for debug, but not for piping
+        if is_debug_mode:
+            eprint("DEBUG INTAKE.PY: Initial DiagnosticJob JSON for Coordinator.py:")
+            eprint(initial_job.model_dump_json(indent=2))
 
-    if is_debug_mode:
-        eprint("DEBUG INTAKE.PY: Initial DiagnosticJob JSON for Coordinator.py (first 300 chars):")
-        eprint(json.dumps(initial_diagnostic_job, indent=2)[:300] + "...") # Pretty print for debug log
+        # 4. Prepare environment for Coordinator.py
+        coordinator_env = os.environ.copy()
+        project_root_str = str(ROOT_DIR)
+        
+        if "PYTHONPATH" in coordinator_env:
+            coordinator_env["PYTHONPATH"] = project_root_str + os.pathsep + coordinator_env["PYTHONPATH"]
+        else:
+            coordinator_env["PYTHONPATH"] = project_root_str
+        
+        # 5. Invoke Python Coordinator
+        try:
+            process = subprocess.run(
+                [sys.executable, str(Coordinator_PY_SCRIPT)],
+                input=initial_job_json,
+                capture_output=True,
+                text=True,
+                check=False,
+                env=coordinator_env
+            )
+        except Exception as e:
+            eprint(f"Error (intake.py): Failed to execute Coordinator.py: {e}")
+            sys.exit(4)
 
-    # 4. Prepare environment for Coordinator.py
-    #    PYTHONPATH needs to include the project root for module imports.
-    #    Pass through the DEBUG status.
-    Coordinator_env = os.environ.copy()
-    project_root_str = str(ROOT_DIR)
-    
-    if "PYTHONPATH" in Coordinator_env:
-        Coordinator_env["PYTHONPATH"] = project_root_str + os.pathsep + Coordinator_env["PYTHONPATH"]
-    else:
-        Coordinator_env["PYTHONPATH"] = project_root_str
-    
-    if is_debug_mode:
-        Coordinator_env["DEBUG"] = "true" # Ensure Coordinator sees it if intake is in debug
-        eprint(f"DEBUG INTAKE.PY: Setting PYTHONPATH to '{Coordinator_env['PYTHONPATH']}' for Coordinator.py call.")
-        eprint(f"DEBUG INTAKE.PY: DEBUG flag for Coordinator.py will be '{Coordinator_env['DEBUG']}'.")
-    else:
-        Coordinator_env["DEBUG"] = "false"
+        # 6. Relay Coordinator.py's stdout
+        sys.stdout.write(process.stdout)
 
+        # 7. Relay Coordinator.py's stderr
+        if process.stderr:
+            eprint("--- Coordinator.py stderr ---")
+            eprint(process.stderr.strip())
+            eprint("--- End Coordinator.py stderr ---")
 
-    # 5. Invoke Python Coordinator
-    if not Coordinator_PY_SCRIPT.is_file():
-        eprint(f"Error (intake.py): Coordinator script not found at '{Coordinator_PY_SCRIPT}'.")
-        sys.exit(3) # Specific exit code for missing Coordinator
+        if is_debug_mode:
+            eprint(f"DEBUG INTAKE.PY: Coordinator.py exited with code {process.returncode}.")
 
-    try:
-        process = subprocess.run(
-            [sys.executable, str(Coordinator_PY_SCRIPT)],
-            input=initial_diagnostic_job_json,
-            capture_output=True,
-            text=True,
-            check=False, # We will check returncode manually
-            env=Coordinator_env
-        )
-    except Exception as e:
-        eprint(f"Error (intake.py): Failed to execute Coordinator.py: {e}")
-        sys.exit(4) # Specific exit code for subprocess execution failure
-
-    # 6. Relay Coordinator.py's stdout (final report summary) to this script's stdout
-    sys.stdout.write(process.stdout)
-
-    # 7. Relay Coordinator.py's stderr (if any) to this script's stderr, especially in debug mode
-    if process.stderr:
-        # In non-debug mode, Coordinator's stderr might still be important for tool errors
-        eprint("--- Coordinator.py stderr ---")
-        eprint(process.stderr.strip())
-        eprint("--- End Coordinator.py stderr ---")
-
-    if is_debug_mode:
-        eprint(f"DEBUG INTAKE.PY: Coordinator.py exited with code {process.returncode}.")
-
-    # 8. Exit with Coordinator.py's exit status
-    sys.exit(process.returncode)
+        # 8. Exit with Coordinator.py's exit status
+        sys.exit(process.returncode)
 
 if __name__ == "__main__":
     main()

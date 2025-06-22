@@ -36,9 +36,8 @@
 #
 # Manager Pipeline (Simplified - SDE V5.1.4):
 #   - Stage 1: Initial Processing & Compilation (`Miner.py`)
-#   - Stage 2: TeX Log Investigation (if TeX compilation fails) (`Investigator.py`)
-#   - Stage 3: Oracle Processing (if errors and leads exist) (`Oracle.py`)
-#   - Stage 4: Report Building (always) (`Reporter.py`)
+#   - Stage 2: Oracle Processing (if TeX compilation fails) (`Oracle.py`)
+#   - Stage 3: Report Building (always) (`Reporter.py`)
 #
 # Environment Assumptions (and asserted):
 #   - Python 3.x
@@ -55,8 +54,14 @@ import sys
 import json # For loading DiagnosticJob from stdin when run as script
 
 # Updated import to use manager_runner
-from utils.data_model import DiagnosticJob
+from utils.data_model import DiagnosticJob, PipelineStatus
 from utils.manager_runner import run_manager # UPDATED
+from utils.logger_utils import logger
+
+# --- Direct Import for Oracle ---
+# Bypassing subprocess for the Oracle due to persistent silent failures.
+# This aligns with the successful unit test integration pattern.
+from managers.Oracle import consult_the_oracle as _invoke_oracle_directly
 
 # Determine logging level based on DEBUG environment variable
 DEBUG_ENV = os.environ.get("DEBUG", "false").lower()
@@ -73,15 +78,12 @@ assert os.path.isdir(MANAGERS_DIR_PATH), \
     f"CRITICAL SETUP ERROR: Managers directory not found at expected path: {MANAGERS_DIR_PATH}"
 
 MINER_MANAGER_PATH = os.path.join(MANAGERS_DIR_PATH, "Miner.py")
-INVESTIGATOR_MANAGER_PATH = os.path.join(MANAGERS_DIR_PATH, "Investigator.py")
 ORACLE_MANAGER_PATH = os.path.join(MANAGERS_DIR_PATH, "Oracle.py")
 REPORTER_MANAGER_PATH = os.path.join(MANAGERS_DIR_PATH, "Reporter.py")
 
 # These assertions remain the same
 assert os.path.isfile(MINER_MANAGER_PATH), \
     f"CRITICAL SETUP ERROR: Miner Manager script (Miner.py) not found: {MINER_MANAGER_PATH}"
-assert os.path.isfile(INVESTIGATOR_MANAGER_PATH), \
-    f"CRITICAL SETUP ERROR: Investigator Manager script (Investigator.py) not found: {INVESTIGATOR_MANAGER_PATH}"
 assert os.path.isfile(ORACLE_MANAGER_PATH), \
     f"CRITICAL SETUP ERROR: Oracle Manager script (Oracle.py) not found: {ORACLE_MANAGER_PATH}"
 assert os.path.isfile(REPORTER_MANAGER_PATH), \
@@ -92,6 +94,22 @@ OUTCOME_MD_ERROR_REMEDIES = "MarkdownError_RemediesProvided"
 OUTCOME_TEX_ERROR_REMEDIES = "TexCompilationError_RemediesProvided"
 OUTCOME_SUCCESS_PDF_VALID = "CompilationSuccess_PDFShouldBeValid"
 OUTCOME_NO_LEADS_MANUAL_REVIEW = "NoActionableLeadsFound_ManualReview"
+
+
+def _dump_job_state(job: DiagnosticJob, stage_name: str):
+    """If in DEBUG mode, saves the current DiagnosticJob state to a JSON file."""
+    if DEBUG_ENV == "true":
+        dump_dir = os.path.join(PROJECT_ROOT, "debug_dumps")
+        os.makedirs(dump_dir, exist_ok=True)
+        # Sanitize stage_name for filename
+        safe_stage_name = stage_name.replace(" ", "_").lower()
+        file_path = os.path.join(dump_dir, f"{job.case_id}_{safe_stage_name}.json")
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(job.model_dump_json(indent=2))
+            logger.info(f"State dump saved to {file_path}")
+        except Exception as e:
+            logger.error(f"Failed to dump job state to {file_path}: {e}")
 
 
 # --- Manager Invocation Functions (Simplified Stages) ---
@@ -113,22 +131,13 @@ def _invoke_miner(diagnostic_job: DiagnosticJob) -> DiagnosticJob:
         "MinerManager did not set final_job_outcome appropriately after its processing."
     return diagnostic_job
 
-def _invoke_investigator(diagnostic_job: DiagnosticJob) -> DiagnosticJob:
-    """Invokes the Investigator Manager if TeX compilation failed."""
-    assert isinstance(diagnostic_job, DiagnosticJob), "Input must be a DiagnosticJob instance"
-    diagnostic_job.current_pipeline_stage = "Stage_InvestigatorManager"
-    logger.info(f"[{diagnostic_job.case_id}] TeX-to-PDF failed. Entering {diagnostic_job.current_pipeline_stage}...")
-    diagnostic_job = run_manager(INVESTIGATOR_MANAGER_PATH, diagnostic_job) # UPDATED
-    logger.info(f"[{diagnostic_job.case_id}] Investigator output: {diagnostic_job.actionable_leads}")
-    diagnostic_job.final_job_outcome = OUTCOME_TEX_ERROR_REMEDIES
-    return diagnostic_job
-
 def _invoke_oracle(diagnostic_job: DiagnosticJob) -> DiagnosticJob:
-    """Invokes the Oracle Manager if actionable leads exist."""
+    """Invokes the Oracle Manager to find remedies for TeX errors."""
     assert isinstance(diagnostic_job, DiagnosticJob), "Input must be a DiagnosticJob instance"
     diagnostic_job.current_pipeline_stage = "Stage_OracleManager"
-    logger.info(f"[{diagnostic_job.case_id}] {len(diagnostic_job.actionable_leads)} actionable leads found. Entering {diagnostic_job.current_pipeline_stage}...")
-    diagnostic_job = run_manager(ORACLE_MANAGER_PATH, diagnostic_job) # UPDATED
+    logger.info(f"[{diagnostic_job.case_id}] TeX compilation failed. Entering {diagnostic_job.current_pipeline_stage} to find remedies...")
+    # --- MODIFIED: Calling Oracle directly instead of via subprocess ---
+    diagnostic_job = _invoke_oracle_directly(diagnostic_job)
     assert isinstance(diagnostic_job.markdown_remedies, list), \
         "OracleManager did not ensure markdown_remedies is a list."
     return diagnostic_job
@@ -146,34 +155,49 @@ def _invoke_reporter(diagnostic_job: DiagnosticJob) -> DiagnosticJob:
 # --- Main Orchestration Logic ---
 def orchestrate_diagnostic_job(diagnostic_job: DiagnosticJob) -> DiagnosticJob:
     """
-    Orchestrates the SDE V5.1.4 diagnostic workflow with 4 primary Managers.
-    Relies on assertions and expects `run_manager` or Managers to raise exceptions on failure.
+    Orchestrates the SDE diagnostic workflow using a state machine based on PipelineStatus.
     """
-    assert isinstance(diagnostic_job, DiagnosticJob), \
-        "Input to orchestrate_diagnostic_job must be a DiagnosticJob instance."
-    logger.info(f"Coordinator: Starting diagnostic job ID: {diagnostic_job.case_id}")
-    diagnostic_job.current_pipeline_stage = "Initial"
+    logger.info(f"Coordinator: Starting diagnostic job ID: {diagnostic_job.job_id}")
 
-    diagnostic_job = _invoke_miner(diagnostic_job)
+    # The main pipeline loop. It continues as long as the status is not terminal.
+    while True:
+        job_id = diagnostic_job.job_id
+        current_status = diagnostic_job.status
+        logger.info(f"[{job_id}] Current pipeline status: {current_status.value}")
+        
+        # State Dispatcher
+        if current_status == PipelineStatus.READY_FOR_MINER:
+            logger.info(f"[{job_id}] Dispatching to Miner.")
+            diagnostic_job = run_manager(MINER_MANAGER_PATH, diagnostic_job)
+        
+        elif current_status == PipelineStatus.MINER_SUCCESS_GATHERED_TEX_LOGS:
+            # WARNING: THIS IS A TEMPORARY MVP END-STATE.
+            # In a complete implementation, this state should dispatch the job
+            # to the Oracle manager for analysis of the TeX logs.
+            # The pipeline is intentionally halted here for now.
+            logger.info(f"[{job_id}] Miner has gathered TeX logs. Pipeline complete for this stage.")
+            break # Exit loop
+        
+        elif current_status == PipelineStatus.MINER_FAILURE_PANDOC:
+            # WARNING: This is a terminal state. No further action is taken.
+            logger.error(f"[{job_id}] Miner failed during Pandoc conversion. Halting pipeline.")
+            break # Exit loop
 
-    if diagnostic_job.md_to_tex_conversion_successful and \
-       not diagnostic_job.tex_to_pdf_compilation_successful:
-        diagnostic_job = _invoke_investigator(diagnostic_job)
-    elif not diagnostic_job.md_to_tex_conversion_successful:
-        logger.info(f"[{diagnostic_job.case_id}] MD-to-TeX conversion failed. Miner handled MD fault analysis. Outcome: {diagnostic_job.final_job_outcome}")
-    elif diagnostic_job.md_to_tex_conversion_successful and diagnostic_job.tex_to_pdf_compilation_successful:
-        logger.info(f"[{diagnostic_job.case_id}] Full compilation successful (as per Miner). Outcome: {diagnostic_job.final_job_outcome}")
+        else:
+            # WARNING: This is a catch-all for any unhandled or future states.
+            # If you add a new PipelineStatus, you MUST add a handler for it above,
+            # otherwise the pipeline will halt here.
+            logger.error(f"[{job_id}] Reached unhandled or terminal state: {current_status.value}. Halting pipeline.")
+            break # Exit loop
 
-    if diagnostic_job.actionable_leads and diagnostic_job.final_job_outcome != OUTCOME_SUCCESS_PDF_VALID:
-        diagnostic_job = _invoke_oracle(diagnostic_job)
-    elif diagnostic_job.final_job_outcome != OUTCOME_SUCCESS_PDF_VALID and not diagnostic_job.actionable_leads:
-        logger.warning(f"[{diagnostic_job.case_id}] An error outcome ({diagnostic_job.final_job_outcome}) was set, but no actionable leads found. Setting for manual review.")
-        diagnostic_job.final_job_outcome = OUTCOME_NO_LEADS_MANUAL_REVIEW
+        # WARNING: This safety break is critical. If a manager script fails to
+        # update the job status, this prevents an infinite loop that would
+        # repeatedly call the same manager.
+        if diagnostic_job.status == current_status:
+            logger.error(f"[{job_id}] Pipeline status did not change from '{current_status.value}'. Halting to prevent infinite loop.")
+            break
 
-    diagnostic_job = _invoke_reporter(diagnostic_job)
-
-    diagnostic_job.current_pipeline_stage = "Completed"
-    logger.info(f"Coordinator: Diagnostic job ID {diagnostic_job.case_id} completed. Final outcome: {diagnostic_job.final_job_outcome}")
+    logger.info(f"Coordinator: Diagnostic job ID {job_id} completed with final status: {diagnostic_job.status.value}")
     return diagnostic_job
 
 # --- Script Entry Point Logic (when called by intake.py) ---
@@ -192,78 +216,24 @@ if __name__ == "__main__":
 
     logger.info("Coordinator script started (invoked by intake.py or directly).")
 
-    # 1. Read DiagnosticJob JSON from stdin (piped from intake.py)
-    initial_job_json_str = ""
+    # 1. Read input
     try:
         initial_job_json_str = sys.stdin.read()
-        assert initial_job_json_str, "Coordinator received empty stdin. Expected DiagnosticJob JSON."
-        logger.debug(f"Coordinator received JSON from stdin (len: {len(initial_job_json_str)}).")
+        if not initial_job_json_str:
+            logger.error("Coordinator received empty stdin.")
+            sys.exit(1)
         
-        # 2. Deserialize to DiagnosticJob Pydantic model
         initial_diagnostic_job = DiagnosticJob.model_validate_json(initial_job_json_str)
-        logger.info(f"Coordinator successfully parsed DiagnosticJob from stdin for case ID: {initial_diagnostic_job.case_id}")
+        logger.info(f"Coordinator successfully parsed DiagnosticJob from stdin for job ID: {initial_diagnostic_job.job_id}")
 
-    except json.JSONDecodeError as e:
-        logger.error(f"Coordinator: Failed to decode JSON from stdin: {e}", exc_info=True)
-        error_report = {
-            "final_user_report_summary": f"CRITICAL COORDINATOR ERROR: Invalid DiagnosticJob JSON received from intake.\nDetails: {e}",
-            "final_job_outcome": "CoordinatorError_InvalidInputJSON"
-        }
-        print(json.dumps(error_report), file=sys.stdout)
-        sys.exit(1)
-    except AssertionError as e:
-        logger.error(f"Coordinator: Assertion failed reading/parsing stdin: {e}", exc_info=True)
-        error_report = {
-            "final_user_report_summary": f"CRITICAL COORDINATOR ERROR: Failed to process input from intake.\nDetails: {e}",
-            "final_job_outcome": "CoordinatorError_InputProcessingError"
-        }
-        print(json.dumps(error_report), file=sys.stdout)
-        sys.exit(1)
-    except Exception as e: 
-        logger.error(f"Coordinator: Failed to create DiagnosticJob from stdin JSON: {e}", exc_info=True)
-        error_report = {
-            "final_user_report_summary": f"CRITICAL COORDINATOR ERROR: Could not validate DiagnosticJob from intake JSON.\nDetails: {type(e).__name__}: {e}",
-            "final_job_outcome": "CoordinatorError_InputValidationError"
-        }
-        print(json.dumps(error_report), file=sys.stdout)
-        sys.exit(1)
-
-
-    try:
-        final_diagnostic_job = orchestrate_diagnostic_job(initial_diagnostic_job)
-    except AssertionError as e:
-        logger.error(f"Coordinator: Assertion failed during orchestration: {e}", exc_info=True)
-        initial_diagnostic_job.final_user_report_summary = (
-            f"CRITICAL COORDINATOR ASSERTION ERROR DURING ORCHESTRATION:\n{e}\n"
-            f"Please check system logs (stderr) for details.\n"
-            f"Case ID: {initial_diagnostic_job.case_id}"
-        )
-        initial_diagnostic_job.final_job_outcome = "CoordinatorAssertionError_Orchestration"
-        final_diagnostic_job = initial_diagnostic_job 
-        print(final_diagnostic_job.final_user_report_summary, file=sys.stdout)
-        sys.exit(1) 
     except Exception as e:
-        logger.error(f"Coordinator: Unhandled exception during orchestration: {e}", exc_info=True)
-        initial_diagnostic_job.final_user_report_summary = (
-            f"CRITICAL COORDINATOR UNHANDLED EXCEPTION DURING ORCHESTRATION:\n{type(e).__name__}: {e}\n"
-            f"Please check system logs (stderr) for details.\n"
-            f"Case ID: {initial_diagnostic_job.case_id}"
-        )
-        initial_diagnostic_job.final_job_outcome = "CoordinatorUnhandledException_Orchestration"
-        final_diagnostic_job = initial_diagnostic_job
-        print(final_diagnostic_job.final_user_report_summary, file=sys.stdout)
+        logger.error(f"Coordinator: Failed to create DiagnosticJob from stdin JSON: {e}", exc_info=True)
         sys.exit(1)
 
+    # 2. Run orchestration
+    final_job = orchestrate_diagnostic_job(initial_diagnostic_job)
 
-    if final_diagnostic_job.final_user_report_summary:
-        print(final_diagnostic_job.final_user_report_summary, file=sys.stdout)
-    else:
-        logger.warning(f"Coordinator: final_user_report_summary is None/empty for case {final_diagnostic_job.case_id}. Outcome: {final_diagnostic_job.final_job_outcome}")
-        default_error_summary = (
-            f"Diagnostic process for case {final_diagnostic_job.case_id} completed, "
-            f"but no specific report summary was generated by the Reporter Manager. " # UPDATED
-            f"Final Outcome: {final_diagnostic_job.final_job_outcome or 'UnknownOutcome_NoReportSummary'}"
-        )
-        print(default_error_summary, file=sys.stdout)
-
+    # 3. Output result
+    sys.stdout.write(final_job.model_dump_json(indent=2))
+    logger.info("Coordinator script finished.")
     sys.exit(0)

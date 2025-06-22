@@ -168,4 +168,24 @@ This section outlines areas where this README and the project understanding coul
 *   **[ ] Review and Standardize Terminology:**
     *   While "Manager" is now dominant, ensure any lingering "service" terminology (if not intended for a specific distinction) is harmonized.
 
+## Core Development Philosophy and Guidelines
+
+This project follows a specific "society of scripts" architectural pattern. Adhering to this philosophy is crucial for maintaining a codebase that is modular, testable, and easy to debug. The following guidelines are based on lessons learned during development and are intended to prevent common frustrations.
+
+### Do:
+
+*   **DO** understand how each Python file is executed. Is it a script run in a separate process (like a Manager) or a module imported by another part of the code? This is the most important consideration.
+*   **DO** use absolute imports from the project root (e.g., `from utils.data_model import ...`) for any script that is executed as a standalone process. The runner script (`intake.py`) correctly sets the `PYTHONPATH` to make this possible.
+*   **DO** verify the *exact* API of the libraries and utilities you are using. This includes checking the version of Pydantic and the specific method names (`model_dump_json()` not `json()`), and checking the parameters of custom project utilities (like the `SdeLogger`).
+*   **DO** trust the linter and test suite. If a test fails or a linter shows an error, assume the bug is in the newly generated code, not the tools.
+*   **DO** embrace the existing architecture. The separation of concerns via pipe-and-filter scripts is a deliberate design choice that prioritizes testability and modularity over raw performance.
+
+### Do Not:
+
+*   **DON'T** use relative imports (e.g., `from . import ...`) in scripts that are run as standalone processes by the Coordinator. This will cause `ImportError` crashes.
+*   **DON'T** assume a custom utility has the same interface as a standard library. Read the source to verify its function signatures.
+*   **DON'T** ignore deprecation warnings. They are a sign of an impending breaking change and should be addressed immediately.
+*   **DON'T** blame the tools. If an edit fails to apply or a test fails, the first assumption should always be that the generated code was incorrect.
+*   **DON'T** propose sweeping architectural changes (e.g., moving to a single monolithic process) without first understanding and respecting the trade-offs of the current design. Computational performance is not a primary concern; ease of development, testing, and debugging is.
+
 
