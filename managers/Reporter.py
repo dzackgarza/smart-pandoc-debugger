@@ -88,35 +88,42 @@ def format_source_context_snippet_for_report(snippet: SourceContextSnippet) -> s
     return "\n".join(lines)
 
 def format_actionable_lead_for_report(lead: ActionableLead, index: int) -> str:
-    """Formats a single ActionableLead for the report, aligning with data_model.py V5.4.1."""
+    """Formats a single ActionableLead for the report, aligning with data_model.py V5.4.1.
+    
+    The problem description is made more prominent and includes additional context to help
+    users understand the issue better.
+    """
     report_lines = []
     report_lines.append(f"\n--- Issue Detected #{index + 1} (Lead ID: {lead.lead_id}) ---")
     report_lines.append(f"Identified by: {lead.source_service}")
-    report_lines.append(f"Problem: {lead.problem_description}")
+    
+    # Make the problem description more prominent
+    report_lines.append("\nISSUE SUMMARY:")
+    report_lines.append(f"  {lead.problem_description}")
+    
+    # Add confidence score if it's not the default (1.0)
+    if hasattr(lead, 'confidence_score') and lead.confidence_score < 1.0:
+        report_lines.append(f"  (Confidence: {lead.confidence_score*100:.0f}%)")
 
-    # Severity is not a direct field in ActionableLead V5.4.1.
-    # It might be inferred or part of internal_details_for_oracle if needed.
-    # For now, we omit it unless you add it to the model or a convention for details.
-    # Example: if lead.internal_details_for_oracle and "severity" in lead.internal_details_for_oracle:
-    #     report_lines.append(f"Severity Level: {lead.internal_details_for_oracle['severity'].upper()}")
+    # Add any additional context from internal_details_for_oracle if available
+    if lead.internal_details_for_oracle:
+        details = []
+        if 'tool_responsible' in lead.internal_details_for_oracle:
+            details.append(f"Tool: {lead.internal_details_for_oracle['tool_responsible']}")
+        if 'stage_of_failure' in lead.internal_details_for_oracle:
+            details.append(f"Stage: {lead.internal_details_for_oracle['stage_of_failure']}")
+        if details:
+            report_lines.append("\n  " + " | ".join(details))
 
+    # Add context snippets if available
     if lead.primary_context_snippets:
-        report_lines.append("Relevant Context:")
+        report_lines.append("\nRELEVANT CONTEXT:")
         for i, snippet_model in enumerate(lead.primary_context_snippets):
             assert isinstance(snippet_model, SourceContextSnippet), \
                 f"Item in primary_context_snippets for lead {lead.lead_id} is not a SourceContextSnippet."
             report_lines.append(f"  --- Context Snippet {i+1} ---")
             report_lines.append(textwrap.indent(format_source_context_snippet_for_report(snippet_model), "  "))
-    else:
-        report_lines.append("Relevant Context: No specific context snippets were provided for this lead.")
-
-    # You might choose to display parts of internal_details_for_oracle if they are standardized
-    # and user-relevant, but generally they are for the Oracle manager.
-    # if lead.internal_details_for_oracle:
-    #    details_to_show = {k:v for k,v in lead.internal_details_for_oracle.items() if k in ['tool_responsible', 'stage_of_failure']}
-    #    if details_to_show:
-    #        report_lines.append(f"Further Details: {details_to_show}")
-            
+    
     return "\n".join(report_lines)
 
 def format_markdown_remedy_for_report(remedy: MarkdownRemedy, index: int) -> str:
