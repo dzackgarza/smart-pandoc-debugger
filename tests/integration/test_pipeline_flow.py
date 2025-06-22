@@ -1,7 +1,7 @@
 # tests/integration/test_pipeline_flow.py
 import pytest
 from unittest.mock import patch, MagicMock, call # Added call
-from utils.data_model import DiagnosticJob, StatusEnum, ActionableLead, LeadTypeEnum, MarkdownRemedy
+from smart_pandoc_debugger.data_model import DiagnosticJob, StatusEnum, ActionableLead, LeadTypeEnum, MarkdownRemedy
 # Assume coordinator.main is the entry point to the pipeline
 # from coordinator import main as run_coordinator_pipeline # This needs coordinator.py to be importable
 

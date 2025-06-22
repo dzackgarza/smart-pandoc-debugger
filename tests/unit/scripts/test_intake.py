@@ -1,7 +1,7 @@
 # tests/unit/scripts/test_intake.py
 import pytest
 from unittest.mock import patch, mock_open, MagicMock # Added MagicMock
-from utils.data_model import DiagnosticJob, StatusEnum
+from smart_pandoc_debugger.data_model import DiagnosticJob, StatusEnum
 # import intake # Assuming intake.py can be imported and has a main()
 
 # Most tests for intake.py will involve mocking stdin/file reading,

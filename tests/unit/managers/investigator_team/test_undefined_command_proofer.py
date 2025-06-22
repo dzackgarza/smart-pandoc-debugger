@@ -1,7 +1,7 @@
 # tests/unit/managers/investigator_team/test_undefined_command_proofer.py
 import pytest
 # from managers.investigator_team.undefined_command_proofer import check # Assuming this is the main function
-from utils.data_model import LeadTypeEnum # For expected lead type
+from smart_pandoc_debugger.data_model import LeadTypeEnum # For expected lead type
 
 # Input for these proofers is typically lines of log text or full log text
 

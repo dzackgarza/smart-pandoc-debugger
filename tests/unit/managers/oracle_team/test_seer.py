@@ -1,7 +1,7 @@
 # tests/unit/managers/oracle_team/test_seer.py
 import pytest
 import yaml # For YAMLError
-from utils.data_model import ActionableLead, MarkdownRemedy, LeadTypeEnum
+from smart_pandoc_debugger.data_model import ActionableLead, MarkdownRemedy, LeadTypeEnum
 # from managers.oracle_team.seer import Seer # Assuming a class or main function
 from unittest.mock import mock_open # Added mock_open
 

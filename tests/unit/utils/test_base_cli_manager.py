@@ -2,7 +2,7 @@
 import pytest
 import json
 from argparse import ArgumentParser # Added
-from utils.data_model import DiagnosticJob, StatusEnum # Added StatusEnum
+from smart_pandoc_debugger.data_model import DiagnosticJob, StatusEnum # Added StatusEnum
 # from utils.base_cli_manager import BaseCliManager # or however it's structured/used
 
 # This file will likely test how a derived manager handles CLI args,

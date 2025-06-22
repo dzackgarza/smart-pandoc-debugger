@@ -1,0 +1,50 @@
+/* Custom styles for Smart Pandoc Debugger documentation */
+
+/* Code blocks */
+.highlight {
+    border-radius: 0.25rem;
+    margin: 1rem 0;
+}
+
+/* Tables */
+.md-typeset table:not([class]) {
+    display: table;
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1em 0;
+}
+
+.md-typeset table:not([class]) th {
+    background-color: rgba(0, 0, 0, 0.05);
+    font-weight: bold;
+}
+
+.md-typeset table:not([class]) th,
+.md-typeset table:not([class]) td {
+    padding: 0.5em 1em;
+    border: 1px solid var(--md-typeset-table-color);
+}
+
+/* Admonitions */
+.md-typeset .admonition {
+    border-radius: 0.25rem;
+    margin: 1em 0;
+}
+
+/* Navigation */
+.md-nav__item--section > .md-nav > .md-nav__list > .md-nav__item {
+    padding-left: 1rem;
+}
+
+/* Footer */
+.md-footer-meta {
+    background-color: var(--md-footer-bg-color--dark);
+}
+
+/* Responsive adjustments */
+@media screen and (max-width: 76.1875em) {
+    .md-nav--primary .md-nav__title[for=__drawer] {
+        background-color: var(--md-primary-fg-color);
+        color: var(--md-primary-bg-color);
+    }
+}

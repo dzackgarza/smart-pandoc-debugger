@@ -1,6 +1,6 @@
 # tests/unit/managers/reporter_team/test_tex_report_unbalanced_braces.py
 import pytest
-from utils.data_model import ActionableLead, LeadTypeEnum, MarkdownRemedy, SourceContextSnippet
+from smart_pandoc_debugger.data_model import ActionableLead, LeadTypeEnum, MarkdownRemedy, SourceContextSnippet
 # from managers.reporter_team.tex_report_unbalanced_braces import format_report_section # Example
 
 @pytest.fixture

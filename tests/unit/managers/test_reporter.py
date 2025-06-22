@@ -1,7 +1,7 @@
 # tests/unit/managers/test_reporter.py
 import pytest
 import logging # Added
-from utils.data_model import DiagnosticJob, StatusEnum, LeadTypeEnum, ActionableLead, MarkdownRemedy
+from smart_pandoc_debugger.data_model import DiagnosticJob, StatusEnum, LeadTypeEnum, ActionableLead, MarkdownRemedy
 # from managers.Reporter import ReporterManager # Assuming class structure
 from unittest.mock import MagicMock # Added
 

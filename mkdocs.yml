@@ -1,0 +1,87 @@
+site_name: Smart Pandoc Debugger
+site_description: A tool for debugging and analyzing Pandoc markdown documents
+site_author: Your Name
+site_url: https://yourusername.github.io/smart-pandoc-debugger/
+
+# Repository
+repo_name: yourusername/smart-pandoc-debugger
+repo_url: https://github.com/yourusername/smart-pandoc-debugger
+
+# Theme configuration
+theme:
+  name: material
+  features:
+    - navigation.tracking
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.highlight
+    - search.suggest
+    - toc.integrate
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep purple
+      accent: deep purple
+      toggle:
+        icon: material/weather-night
+        name: Switch to light mode
+
+# Navigation
+nav:
+  - Home: index.md
+  - Project Plan: PROJECT_PLAN.md
+  - Development:
+    - Setup: development/setup.md
+    - Testing: development/testing.md
+    - Managers: development/managers.md
+
+# Plugins
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+            show_root_toc_entry: true
+
+# Extensions
+markdown_extensions:
+  - admonition
+  - codehilite:
+      guess_lang: true
+  - extra
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.tabbed
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+  - toc:
+      permalink: true
+      toc_depth: 3
+
+# Customization
+extra_css:
+  - css/extra.css
+
+extra_javascript:
+  - js/extra.js
+
+# Build options
+strict: true
+use_directory_urls: true
+
+# Copyright
+copyright: Copyright &copy; 2025 Your Name
