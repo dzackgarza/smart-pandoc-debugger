@@ -1,0 +1,10 @@
+# Ignore the erroneous, duplicate investigator directory
+managers/investigator_team/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# VSCode
+.vscode/ 

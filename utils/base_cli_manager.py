@@ -1,66 +1,69 @@
-# manager_utils/base_cli_manager.py - V1.7
-# Provides a base class for CLI manager applications.
-# Enforces contracts by relying on Python's default exception propagation.
+# utils/base_cli_manager.py - V2.0
+# Provides a simple lifecycle function for pipe-based manager scripts.
 
-import os
 import sys
-import argparse
-import subprocess
+import json
+import traceback
+from .data_model import DiagnosticJob
+from .logger_utils import logger
+import pydantic
 
-from .logger_utils import logger 
+def run_manager_script(processing_function):
+    """
+    Handles the standard lifecycle of a manager script that operates in a pipe.
 
+    This function is responsible for the boilerplate of:
+    1. Reading a JSON string from standard input.
+    2. Parsing and validating it into a DiagnosticJob Pydantic model.
+    3. Calling the manager's specific `processing_function` with the job object.
+    4. Taking the modified job object returned by the processing function.
+    5. Serializing it back to a JSON string.
+    6. Printing the final JSON to standard output.
 
-class TeamMemberCrashError(subprocess.CalledProcessError):
-    """Exception for when a called script (team member) crashes.
-       Assumes self.cmd is a non-empty list [executable, ...]."""
-    def __init__(self, proc: subprocess.CompletedProcess, message_prefix="Team member script crashed"):
-        super().__init__(proc.returncode, proc.args, output=proc.stdout, stderr=proc.stderr)
-        self.script_name = os.path.basename(self.cmd[0]) # Crashes if self.cmd is not list[0]
-        self.message_prefix = message_prefix
+    If any part of this process fails (e.g., invalid input JSON, error
+    during processing), an error is logged to stderr and the script exits with
+    a non-zero status code to halt the pipeline.
 
-    def __str__(self):
-        details = f"{self.message_prefix}: '{self.script_name}' failed with RC {self.returncode}."
-        if self.stderr: 
-            details += f"\n  Stderr from '{self.script_name}':\n{self.stderr.strip()}"
-        return details
+    Args:
+        processing_function (callable): A function that takes a single
+            argument (a DiagnosticJob object) and returns a modified
+            DiagnosticJob object.
+    """
+    # WARNING: This function is the primary entry point for all managers that
+    # follow the "Pipe-Script Contract". It is intentionally designed to be
+    # fragile. Any exception, from JSON validation to an unhandled error in
+    # the 'processing_function', will cause the script to exit with a non-zero
+    # status code. This is the core mechanism that halts the Coordinator's
+    # pipeline and prevents cascading failures. Do not add broad, silent
+    # error catching here without a very good reason.
+    try:
+        # 1. Read from stdin
+        input_json_str = sys.stdin.read()
+        if not input_json_str:
+            logger.error("BaseCliManager: Stdin was empty. No job to process.")
+            sys.exit(1)
 
-class ManagerSetupError(Exception):
-    """Exception for logical errors during manager setup."""
-    pass
+        # 2. Parse and validate
+        job = DiagnosticJob.parse_raw(input_json_str)
+        job.log_message(f"Successfully parsed job. Current status: {job.status.value}")
 
+        # 3. Call the manager's main logic
+        updated_job = processing_function(job)
 
-class BaseCliManager:
-    """Base class for CLI applications with subcommand dispatching."""
-    def __init__(self, manager_name: str, description: str = "Manager Application"):
-        self.manager_name = manager_name
-        self.arg_parser = argparse.ArgumentParser(description=description)
-        self.subparsers = None 
-        logger.debug(f"{self.manager_name}: Initialized.", manager_name=self.manager_name)
+        # 4. Serialize and 5. Print to stdout
+        sys.stdout.write(updated_job.model_dump_json(indent=2))
 
-    def _add_subparsers_support(self, title="Commands", help_text="Available commands", required=True) -> argparse._SubParsersAction:
-        """Initializes and returns subparsers. Call once if using subcommands."""
-        self.subparsers = self.arg_parser.add_subparsers(
-            dest="command", required=required, title=title, help=help_text
-        )
-        return self.subparsers
-
-    def _setup_cli_commands(self):
-        """Subclasses MUST implement this to define CLI arguments/subcommands."""
-        raise NotImplementedError(f"{self.manager_name}: _setup_cli_commands not implemented.")
-
-    def _dispatch_command(self, args: argparse.Namespace):
-        """Subclasses MUST implement this to execute logic based on parsed CLI args."""
-        raise NotImplementedError(f"{self.manager_name}: _dispatch_command not implemented.")
-
-    def run_cli(self):
-        """Main CLI execution entry point for manager applications."""
-        self._setup_cli_commands()
-        
-        logger.debug(f"{self.manager_name} CLI: Raw args: {sys.argv[1:]}", manager_name=self.manager_name)
-        args = self.arg_parser.parse_args() # Exits on CLI parsing error (status 2 from argparse)
-        logger.debug(f"{self.manager_name} CLI: Parsed: '{getattr(args, 'command', 'N/A')}', Args: {vars(args)}", manager_name=self.manager_name)
-        
-        self._dispatch_command(args) # Core logic. Exceptions propagate and crash script.
-        
-        logger.debug(f"{self.manager_name} CLI: Command '{getattr(args, 'command', 'N/A')}' completed.", manager_name=self.manager_name)
-        sys.exit(0)
+    except json.JSONDecodeError:
+        logger.error("BaseCliManager: Failed to decode JSON from stdin.")
+        sys.exit(1)
+    except pydantic.ValidationError as e:
+        logger.error(f"BaseCliManager: Input data failed validation for DiagnosticJob.\n{e}")
+        sys.exit(1)
+    except Exception as e:
+        tb_str = traceback.format_exc()
+        logger.error(f"BaseCliManager: An unexpected error occurred during job processing: {e}\n{tb_str}")
+        # Attempt to write out the job state before failing if possible
+        if 'job' in locals() and isinstance(job, DiagnosticJob):
+            job.log_message(f"FATAL ERROR: {e}\n{tb_str}")
+            sys.stdout.write(job.model_dump_json(indent=2))
+        sys.exit(1)
