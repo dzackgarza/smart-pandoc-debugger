@@ -1,0 +1,14 @@
+# Make roadmap files read-only in the repository
+# This prevents accidental modifications to the versioned roadmap
+/docs/roadmap/V0.0.md -text -diff -merge
+/docs/roadmap/V1.0.md -text -diff -merge
+/docs/roadmap/V2.0.md -text -diff -merge
+/docs/roadmap/V99.md -text -diff -merge
+/docs/roadmap/README.md -text -diff -merge
+
+# Make these files read-only in the working directory too
+/docs/roadmap/V0.0.md !eol !ident -crlf -text
+/docs/roadmap/V1.0.md !eol !ident -crlf -text
+/docs/roadmap/V2.0.md !eol !ident -crlf -text
+/docs/roadmap/V99.md !eol !ident -crlf -text
+/docs/roadmap/README.md !eol !ident -crlf -text

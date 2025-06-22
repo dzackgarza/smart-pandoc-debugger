@@ -1,7 +1,7 @@
 # tests/unit/managers/investigator_team/test_error_finder.py
 import pytest
 # from managers.investigator_team.error_finder import find_errors_in_log # Main function
-from utils.data_model import ActionableLead, LeadTypeEnum # ActionableLead might not be directly returned
+from smart_pandoc_debugger.data_model import ActionableLead, LeadTypeEnum # ActionableLead might not be directly returned
 
 # This might be a list of Pydantic models, or dicts, depending on error_finder's interface.
 # For simplicity, assume it returns data that InvestigatorManager converts to ActionableLead.

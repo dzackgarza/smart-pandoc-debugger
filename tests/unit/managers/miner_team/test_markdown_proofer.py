@@ -1,7 +1,7 @@
 # tests/unit/managers/miner_team/test_markdown_proofer.py
 import pytest
 # from managers.miner_team.markdown_proofer import proof_markdown # Assuming main function
-from utils.data_model import ActionableLead, LeadTypeEnum # ActionableLead might not be directly returned
+from smart_pandoc_debugger.data_model import ActionableLead, LeadTypeEnum # ActionableLead might not be directly returned
 
 @pytest.fixture
 def sample_markdown_clean():

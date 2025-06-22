@@ -1,7 +1,7 @@
 # tests/unit/scripts/test_coordinator.py
 import pytest
 from unittest.mock import patch, MagicMock, call
-from utils.data_model import DiagnosticJob, StatusEnum, ActionableLead, LeadTypeEnum, MarkdownRemedy, UrgencyEnum, SourceContextSnippet
+from smart_pandoc_debugger.data_model import DiagnosticJob, StatusEnum, ActionableLead, LeadTypeEnum, MarkdownRemedy, UrgencyEnum, SourceContextSnippet
 # import coordinator
 
 # Test importability

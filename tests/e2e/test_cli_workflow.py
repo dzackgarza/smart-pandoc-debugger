@@ -198,7 +198,7 @@ def test_e2e_json_output_parsing_if_supported():
     # # if result.returncode == 0 or "error" not in result.stderr.lower(): # Adjust based on SDE behavior with --output-json
     # #    try:
     # #        output_data = json.loads(result.stdout)
-    # #        # from utils.data_model import DiagnosticJob # For type checking if needed
+    # #        # from smart_pandoc_debugger.data_model import DiagnosticJob # For type checking if needed
     # #        # assert isinstance(output_data, dict)
     # #        # job = DiagnosticJob(**output_data) # Validate against Pydantic model
     # #        # assert job.status == StatusEnum.REPORT_GENERATED

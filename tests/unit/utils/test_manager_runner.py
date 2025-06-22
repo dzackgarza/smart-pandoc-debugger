@@ -2,7 +2,7 @@
 import pytest
 import json
 import subprocess # Added for TimeoutExpired
-from utils.data_model import DiagnosticJob, StatusEnum
+from smart_pandoc_debugger.data_model import DiagnosticJob, StatusEnum
 # from utils.manager_runner import run_manager # Assuming this is the main function
 
 @pytest.fixture

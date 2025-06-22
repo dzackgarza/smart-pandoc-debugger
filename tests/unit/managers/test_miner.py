@@ -1,6 +1,6 @@
 # tests/unit/managers/test_miner.py
 import pytest
-from utils.data_model import DiagnosticJob, StatusEnum, LeadTypeEnum, ActionableLead
+from smart_pandoc_debugger.data_model import DiagnosticJob, StatusEnum, LeadTypeEnum, ActionableLead
 # from managers.Miner import MinerManager # Assuming a class structure
 # from unittest.mock import MagicMock
 
