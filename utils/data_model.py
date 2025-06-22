@@ -31,6 +31,59 @@ import datetime
 import uuid
 import pathlib # For pathlib.Path type hint
 
+from enum import Enum
+
+class StatusEnum(str, Enum):
+    PENDING = "pending"
+    MINER_PROCESSING = "miner_processing"
+    MINER_MD_TO_TEX_SUCCESS = "miner_md_to_tex_success"
+    MINER_MD_TO_TEX_FAILED = "miner_md_to_tex_failed"
+    MINER_TEX_TO_PDF_SUCCESS = "miner_tex_to_pdf_success"
+    MINER_TEX_TO_PDF_FAILED = "miner_tex_to_pdf_failed"
+    COMPILATION_SUCCESS = "compilation_success"
+    INVESTIGATOR_PROCESSING = "investigator_processing"
+    INVESTIGATOR_LEADS_FOUND = "investigator_leads_found"
+    INVESTIGATOR_NO_LEADS_FOUND = "investigator_no_leads_found"
+    INVESTIGATOR_LOG_MISSING = "investigator_log_missing"
+    INVESTIGATOR_CORRUPT_LOG = "investigator_corrupt_log"
+    INVESTIGATOR_LOG_PERMISSION_ERROR = "investigator_log_permission_error"
+    ORACLE_PROCESSING = "oracle_processing"
+    ORACLE_REMEDIES_GENERATED = "oracle_remedies_generated"
+    ORACLE_NO_REMEDIES_FOUND = "oracle_no_remedies_found"
+    ORACLE_TIMEOUT = "oracle_timeout"
+    REPORTER_PROCESSING = "reporter_processing"
+    REPORT_GENERATED = "report_generated"
+    REPORT_GENERATION_FAILED = "report_generation_failed"
+    ERROR = "error"
+
+class LeadTypeEnum(str, Enum):
+    MARKDOWN_LINT = "markdown_lint"
+    MARKDOWN_SYNTAX = "markdown_syntax"
+    LATEX_ERROR = "latex_error"
+    LATEX_WARNING = "latex_warning"
+    LATEX_UNDEFINED_CONTROL_SEQUENCE = "latex_undefined_control_sequence"
+    LATEX_UNDEFINED_ENVIRONMENT = "latex_undefined_environment"
+    LATEX_MISSING_DOLLAR = "latex_missing_dollar"
+    LATEX_UNBALANCED_BRACES = "latex_unbalanced_braces"
+    LATEX_MISMATCHED_DELIMITERS = "latex_mismatched_delimiters"
+    LATEX_RUNAWAY_ARGUMENT = "latex_runaway_argument"
+    GENERAL_ERROR = "general_error"
+
+class UrgencyEnum(str, Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+class ProcessOutput(BaseModel):
+    """Represents the output of an external process call."""
+    stdout: str
+    stderr: str
+    return_code: int
+
+    def is_success(self) -> bool:
+        return self.return_code == 0
+
 # --- Atomic Data Structures ---
 
 class SourceContextSnippet(BaseModel):
