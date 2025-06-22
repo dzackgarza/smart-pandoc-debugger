@@ -99,6 +99,14 @@ class ActionableLead(BaseModel):
                     "by the 'Oracle' manager. "
                     "Example: {'tool_responsible': 'pandoc', 'stage_of_failure': 'md-to-tex', 'return_code': 1}."
     )
+    confidence_score: float = Field(
+        1.0,
+        ge=0.0,
+        le=1.0,
+        description="A confidence score between 0.0 and 1.0 indicating how confident the system is "
+                    "that this lead represents a real issue that needs to be fixed. "
+                    "Higher values indicate higher confidence."
+    )
 
 class MarkdownRemedy(BaseModel):
     """
