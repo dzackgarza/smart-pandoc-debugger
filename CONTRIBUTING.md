@@ -29,10 +29,44 @@ Thank you for your interest in contributing to Smart Pandoc Debugger! This docum
    gh pr view 13 --json mergeable,mergeableState,mergeStateStatus,mergeCommit,autoMergeRequest
    ```
 
-3. **Check which files have conflicts**
+3. **Automatically detect conflicting files**
    ```bash
-   # Get list of files with conflicts
-   git diff --name-only --diff-filter=U
+   # Get list of all modified files in the PR
+   PR_FILES=$(gh pr view 13 --json files --jq '.files[].path')
+   
+   # Check each file for conflicts
+   for file in $PR_FILES; do
+     if ! git diff --quiet --diff-filter=U -- "$file" 2>/dev/null; then
+       echo "Conflict found in: $file"
+     fi
+   done
+   ```
+
+4. **One-command conflict check**
+   ```bash
+   # Single command to list all conflicting files in the PR
+   gh pr view 13 --json files --jq '.files[].path' | while read -r file; do git diff --name-only --diff-filter=U -- "$file" 2>/dev/null; done | grep -v '^$'
+   ```
+
+5. **Check specific PR for conflicts (replace PR_NUMBER)**
+   ```bash
+   # Function to check conflicts for a PR
+   check_pr_conflicts() {
+     local pr=$1
+     echo "Checking PR #$pr for conflicts..."
+     if gh pr view $pr --json mergeable,mergeableState | jq -e '.mergeable == false and .mergeableState == "dirty"' >/dev/null; then
+       echo "❌ Conflicts detected in PR #$pr"
+       echo "Files with conflicts:"
+       gh pr view $pr --json files --jq '.files[].path' | while read -r file; do 
+         git diff --name-only --diff-filter=U -- "$file" 2>/dev/null; 
+       done | grep -v '^$' | sort | uniq | sed 's/^/  - /'
+     else
+       echo "✅ No conflicts detected in PR #$pr"
+     fi
+   }
+   
+   # Example usage:
+   # check_pr_conflicts 13
    ```
 
 #### Common Conflict Scenarios
