@@ -270,7 +270,7 @@ def main():
         
         if args.source_file and os.path.exists(args.source_file):
             # Return full ActionableLead objects
-            print(json.dumps([lead.to_dict() for lead in leads]))
+            print(json.dumps([lead.model_dump() for lead in leads]))
         else:
             # Return simplified output
             print(json.dumps([{

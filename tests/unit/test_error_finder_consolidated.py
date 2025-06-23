@@ -56,8 +56,9 @@ def test_test_file_integrity():
 # --- End Test File Integrity Check ---
 
 # Import the module to test
-sys.path.insert(0, str(Path(__file__).parent.parent))
-from managers.investigator_team.error_finder_dev import find_primary_error
+# Add src to the Python path to find the package
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
+from smart_pandoc_debugger.managers.investigator_team.error_finder_dev import find_primary_error
 
 # Load test cases from YAML file
 def load_test_cases() -> Dict[str, Dict[str, Any]]:
