@@ -6,29 +6,44 @@ Thank you for your interest in contributing to Smart Pandoc Debugger! This docum
 
 ### Checking for Merge Conflicts
 
-When creating or reviewing a PR, always check for these important status messages:
-
-1. **Merge Conflict Warning**
+#### Via GitHub Web Interface
+1. When viewing a PR, look for the merge conflict banner:
    ```
    This branch has conflicts that must be resolved
    Use the web editor or the command line to resolve conflicts before continuing.
    ```
-   - This appears when there are conflicts with the target branch
-   - Common files that might have conflicts include:
-     - `src/smart_pandoc_debugger/managers/investigator_team/undefined_environment_proofer.py`
-     - Other files modified in both branches
+2. Check the "Conversation" tab for any automated messages about merge conflicts
+3. Look for the "Resolve conflicts" button near the bottom of the PR page
 
-2. **How to check for conflicts locally**
+#### Via GitHub CLI
+
+1. **Check merge conflict status**
    ```bash
-   # From your feature branch
-   git fetch origin main
-   git merge-base --is-ancestor origin/main HEAD || git merge origin/main
+   # Check if PR has conflicts (returns 'true' if conflicts exist)
+   gh pr view 13 --json mergeable,mergeableState | jq '.mergeable == false and .mergeableState == "dirty"'
    ```
-   - If there are conflicts, resolve them before pushing
 
-3. **Required Status Checks**
-   - Check that all required status checks are passing
-   - Look for any failing tests or linting errors
+2. **View detailed PR status**
+   ```bash
+   # Get detailed PR information including merge status
+   gh pr view 13 --json mergeable,mergeableState,mergeStateStatus,mergeCommit,autoMergeRequest
+   ```
+
+3. **Check which files have conflicts**
+   ```bash
+   # Get list of files with conflicts
+   git diff --name-only --diff-filter=U
+   ```
+
+#### Common Conflict Scenarios
+- Files modified in both branches:
+  - `src/smart_pandoc_debugger/managers/investigator_team/undefined_environment_proofer.py`
+  - Other files modified in both the PR and target branch
+
+#### Required Status Checks
+- Check that all required status checks are passing
+- Look for any failing tests or linting errors
+- Ensure the branch is up to date with the target branch
 
 ## Development Workflow
 
