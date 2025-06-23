@@ -232,42 +232,6 @@ class TestV1RoadmapCompliance(TestBase, unittest.TestCase):
         # For now, we'll just check that the test file exists
         self.assertTrue(os.path.exists(__file__), "Test file should exist")
 
-
-class TestRoadmapProgress(TestBase):
-    """Test cases for tracking V1.0 roadmap progress."""
-
-    def test_roadmap_progress(self):
-        """Track progress against the V1.0 roadmap."""
-        # Define the expected status for each branch
-        branch_status = {
-            "branch1_text_validation": "incomplete",
-            "branch2_math_validation": "complete",
-            "branch3_environment_command_validation": "partial",  # Marked as partial since we've added the test method
-            "branch4_code_block_validation": "incomplete",
-            "branch5_references": "incomplete",
-            "branch6_citations": "incomplete",
-            "branch7_tables": "incomplete",
-            "branch8_brackets": "incomplete",
-            "branch9_error_reporting": "incomplete",
-        }
-
-        # Check each branch status
-        for branch, status in branch_status.items():
-            if status == "incomplete":
-                self.skipTest(f"{branch} is not yet implemented")
-            elif status == "partial":
-                self.skipTest(f"{branch} is partially implemented")
-
-            # If we get here, the branch should be complete
-            self.assertEqual(
-                status, "complete",
-                f"{branch} is marked as {status} but should be complete"
-            )
-
-
-class TestDocumentationUpdates(TestBase, unittest.TestCase):
-    """Test cases for documentation updates in the V1.0 roadmap."""
-
     def test_branch11_documentation_updates(self):
         """Test that documentation updates meet requirements."""
         # Test that CONTRIBUTING.md exists and is not empty
@@ -297,5 +261,40 @@ class TestDocumentationUpdates(TestBase, unittest.TestCase):
                 content, 
                 f"Missing section in CONTRIBUTING.md: {section}"
             )
-        
-        # All assertions passed
+
+
+class TestRoadmapProgress(TestBase):
+    """Test cases for tracking V1.0 roadmap progress."""
+
+    def test_roadmap_progress(self):
+        """Track progress against the V1.0 roadmap."""
+        # Define the expected status for each branch
+        branch_status = {
+            "branch1_text_validation": "incomplete",
+            "branch2_math_validation": "complete",
+            "branch3_environment_command_validation": "partial",  # Marked as partial since we've added the test method
+            "branch4_code_block_validation": "incomplete",
+            "branch5_references": "incomplete",
+            "branch6_citations": "incomplete",
+            "branch7_tables": "incomplete",
+            "branch8_brackets": "incomplete",
+            "branch9_error_reporting": "incomplete",
+            "branch11_documentation_updates": "complete"
+        }
+
+        # Check each branch status
+        for branch, status in branch_status.items():
+            if status == "incomplete":
+                self.skipTest(f"{branch} is not yet implemented")
+            elif status == "partial":
+                self.skipTest(f"{branch} is partially implemented")
+
+            # If we get here, the branch should be complete
+            self.assertEqual(
+                status, "complete",
+                f"{branch} is marked as {status} but should be complete"
+            )
+
+
+if __name__ == "__main__":
+    unittest.main()

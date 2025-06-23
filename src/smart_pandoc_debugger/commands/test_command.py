@@ -50,7 +50,7 @@ BRANCH_TESTS = {
         "description": "Code block and structure validation"
     },
     "branch11_documentation_updates": {
-        "test_name": "TestDocumentationUpdates.test_branch11_documentation_updates",
+        "test_name": "TestV1RoadmapCompliance.test_branch11_documentation_updates",
         "status": "complete",
         "description": "Documentation and contribution guidelines updates"
     },
