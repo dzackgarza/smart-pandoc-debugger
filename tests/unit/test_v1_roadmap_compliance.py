@@ -298,5 +298,4 @@ class TestDocumentationUpdates(TestBase, unittest.TestCase):
                 f"Missing section in CONTRIBUTING.md: {section}"
             )
         
-        # If we get here, all tests passed
-        return True
+        # All assertions passed
