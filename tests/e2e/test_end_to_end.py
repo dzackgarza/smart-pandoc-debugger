@@ -152,7 +152,7 @@ class TestEndToEndProcessing(BaseFunctionalTest):
                     f"{key} has wrong type, expected {expected_type}, got {type(result[key])}"
         
         # Validate warnings and errors
-        for item in (result["warnings"] + result["errors"]): # Explicitly group concatenation
+        for item in result["warnings"] + result["errors"]: # Using main's version
             self._validate_issue(item)
     
     def _validate_issue(self, issue: Dict[str, Any]) -> None:

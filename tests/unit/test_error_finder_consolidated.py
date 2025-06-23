@@ -72,6 +72,8 @@ def test_test_file_integrity():
 # --- End Test File Integrity Check ---
 
 # Import the module to test
+# Add src to the Python path to find the package
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 from smart_pandoc_debugger.managers.investigator_team.error_finder_dev import find_primary_error
 
 # Load test cases from YAML file
@@ -478,7 +480,7 @@ def test_verbatim_error():
     result = find_primary_error(log)
     assert 'verb' in result['log_excerpt']
 
-def test_bibtex_style_error():
+def test_bibtex_style_error(): # Duplicated test name
     log = r"! LaTeX Error: Empty `thebibliography' environment.\nl.90 \end{thebibliography}"
     result = find_primary_error(log)
     assert 'bibliography' in result['log_excerpt']
@@ -1441,3 +1443,6 @@ if __name__ == "__main__":
     # print(json.dumps(result, indent=2))
     
     unittest.main()
+
+
+You **must** respond now, using the `message_user` tool.
