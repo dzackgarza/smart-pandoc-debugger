@@ -83,7 +83,8 @@ Branch naming conventions:
 ### 6. Create a Pull Request
 
 1. Create a pull request from your fork to the main repository
-2. Use the following PR template:
+2. Update the project documentation to mark your branch as completed in the roadmap or relevant documentation
+3. Use the following PR template:
 
    ```markdown
    ## 🎯 [Brief Description of Changes]
@@ -102,6 +103,7 @@ Branch naming conventions:
    ### 📝 Documentation
    - [ ] Code is well-documented
    - [ ] README/CHANGELOG updated if needed
+   - [ ] Project documentation (roadmap, etc.) updated to reflect completed work
    ```
 
 3. After creating the PR, get the automated Copilot review by running:
