@@ -60,7 +60,24 @@ docs(readme): Update installation instructions
 
 ## Handling Reviewer Comments
 
-### Quick Response Method
+### 🤖 Idiot-Proof Method for LLMs
+
+**Use the automated PR response helper:**
+
+```bash
+spd respond-to-pr [PR_NUMBER]
+```
+
+This command will:
+- ✅ Automatically fetch all reviewer comments from the PR
+- ✅ Generate the exact backlink response template 
+- ✅ Show you the precise GitHub CLI command to post it
+- ✅ Provide step-by-step instructions for fixing issues
+- ✅ Enforce the correct response protocol automatically
+
+**No more manual template construction or guessing!**
+
+### Manual Method (Advanced Users)
 
 1. **Find comments**: `GH_PAGER=cat gh pr view [PR_NUMBER]`
 2. **Fix issues**: Address each concern in code

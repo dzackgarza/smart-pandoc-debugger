@@ -7,6 +7,7 @@ Usage:
     cat doc.md | spd        # Process stdin and output report to stdout  
     spd test                # Run internal tiered tests (dev command)
     spd test-doc doc.md     # Test/analyze a document
+    spd respond-to-pr [PR_NUMBER]     # Help respond to PR comments (for LLMs)
 """
 
 import sys
@@ -14,6 +15,7 @@ import subprocess
 import json
 from pathlib import Path
 from typing import Optional
+import argparse
 
 # ANSI color codes
 GREEN = '\033[92m'
@@ -370,68 +372,88 @@ def run_tiered_tests() -> int:
         return 1
 
 
-def main(argv: Optional[list] = None) -> int:
-    """Main entry point for the Smart Pandoc Debugger CLI.
-    
-    Args:
-        argv: Command line arguments. If None, uses sys.argv[1:].
-        
-    Returns:
-        int: Exit code (0 for success, non-zero for errors)
+def run_pr_response_helper() -> int:
     """
-    if argv is None:
-        argv = sys.argv[1:]
+    Run the PR response helper to assist LLMs in responding to reviewer comments.
     
-    # Dead simple interface - no argparse needed
-    if len(argv) == 0:
-        # No arguments - read from stdin
-        return process_document()
+    This command implements the exact protocol described in CONTRIBUTING.md
+    for responding to Codepilot and other reviewer comments with proper backlinks.
     
-    elif len(argv) == 1:
-        arg = argv[0]
+    Returns:
+        int: Exit code (0 for success, 1 for failure)
+    """
+    try:
+        import subprocess
+        import sys
+        import os
         
-        if arg == 'test':
-            # Internal tiered tests (dev command)
-            return run_tiered_tests()
-        elif arg in ['-h', '--help']:
-            # Help
-            print(__doc__)
-            return 0
-        elif arg in ['-v', '--version']:
-            # Version
-            try:
-                from smart_pandoc_debugger import __version__
-                print(f"Smart Pandoc Debugger v{__version__}")
-            except ImportError:
-                print("Smart Pandoc Debugger v0.1.0")
-            return 0
-        else:
-            # Assume it's a file
-            return process_document(arg)
-    
-    elif len(argv) == 2:
-        cmd, arg = argv[0], argv[1]
+        # Get the project root directory
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+        helper_script = os.path.join(project_root, "utils", "pr_response_helper.py")
         
-        if cmd == 'test-doc':
-            # Document testing
-            return test_document(arg)
-        else:
-            # Unknown command
-            print(f"❌ Unknown command: {cmd}", file=sys.stderr)
-            print("Usage:", file=sys.stderr)
-            print("  spd doc.md           # Process file", file=sys.stderr)
-            print("  cat doc.md | spd     # Process stdin", file=sys.stderr)
-            print("  spd test             # Run internal tests", file=sys.stderr)
-            print("  spd test-doc doc.md  # Test document", file=sys.stderr)
+        if not os.path.exists(helper_script):
+            print("❌ Error: PR response helper script not found.")
+            print(f"Expected at: {helper_script}")
             return 1
+        
+        # Pass through all command line arguments except the 'respond-to-pr' command
+        args = sys.argv[2:]  # Skip 'spd' and 'respond-to-pr'
+        cmd = [sys.executable, helper_script] + args
+        
+        # Run the helper script
+        result = subprocess.run(cmd)
+        return result.returncode
+        
+    except Exception as e:
+        print(f"❌ Error running PR response helper: {e}")
+        return 1
+
+
+def main():
+    """Main entry point for the Smart Pandoc Debugger CLI."""
+    parser = argparse.ArgumentParser(
+        description="Smart Pandoc Debugger: Analyze and fix Pandoc markdown documents",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  spd document.md                    # Analyze a markdown file
+  echo "# Test" | spd               # Process stdin
+  spd test-doc                      # Run tiered tests
+  spd respond-to-pr [PR_NUMBER]     # Help respond to PR comments (for LLMs)
+
+For more help: https://github.com/dzackgarza/smart-pandoc-debugger
+        """
+    )
     
+    parser.add_argument('command', nargs='?', default='analyze',
+                       help='Command to run: analyze (default), test-doc, or respond-to-pr')
+    parser.add_argument('target', nargs='?', 
+                       help='Target file for analysis or PR number for respond-to-pr')
+    parser.add_argument('--version', action='version', version='Smart Pandoc Debugger v0.1.0')
+    
+    # Handle case where no arguments are provided
+    if len(sys.argv) == 1:
+        parser.print_help()
+        return 1
+    
+    args, unknown = parser.parse_known_args()
+    
+    if args.command == 'test-doc':
+        return run_tiered_tests()
+    elif args.command == 'respond-to-pr':
+        return run_pr_response_helper()
+    elif args.command == 'analyze' or args.target:
+        # Handle both 'spd analyze file.md' and 'spd file.md'
+        target_file = args.target if args.target else args.command
+        if target_file == 'analyze':
+            # stdin mode: spd analyze
+            return process_document()
+        else:
+            # file mode: spd file.md or spd analyze file.md
+            return process_document(target_file)
     else:
-        # Too many arguments
-        print("Usage:", file=sys.stderr)
-        print("  spd doc.md           # Process file", file=sys.stderr)
-        print("  cat doc.md | spd     # Process stdin", file=sys.stderr)
-        print("  spd test             # Run internal tests", file=sys.stderr)
-        print("  spd test-doc doc.md  # Test document", file=sys.stderr)
+        print(f"❌ Unknown command: {args.command}")
+        parser.print_help()
         return 1
 
 
