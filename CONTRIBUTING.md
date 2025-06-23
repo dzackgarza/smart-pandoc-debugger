@@ -2,6 +2,34 @@
 
 Thank you for your interest in contributing to Smart Pandoc Debugger! This document outlines the process for contributing to the project.
 
+## PR Status Messages
+
+### Checking for Merge Conflicts
+
+When creating or reviewing a PR, always check for these important status messages:
+
+1. **Merge Conflict Warning**
+   ```
+   This branch has conflicts that must be resolved
+   Use the web editor or the command line to resolve conflicts before continuing.
+   ```
+   - This appears when there are conflicts with the target branch
+   - Common files that might have conflicts include:
+     - `src/smart_pandoc_debugger/managers/investigator_team/undefined_environment_proofer.py`
+     - Other files modified in both branches
+
+2. **How to check for conflicts locally**
+   ```bash
+   # From your feature branch
+   git fetch origin main
+   git merge-base --is-ancestor origin/main HEAD || git merge origin/main
+   ```
+   - If there are conflicts, resolve them before pushing
+
+3. **Required Status Checks**
+   - Check that all required status checks are passing
+   - Look for any failing tests or linting errors
+
 ## Development Workflow
 
 ### 1. Setup
@@ -36,55 +64,7 @@ git checkout -b feature/descriptive-branch-name
    PYTHONPATH=./src pytest tests/ -v
    ```
 
-### 4. Handle Merge Conflicts
-
-When working with feature branches, you might encounter merge conflicts. Here's how to handle them:
-
-1. **Check for conflicts before creating a PR**:
-   ```bash
-   git fetch origin main
-   git merge origin/main
-   ```
-
-2. **Resolving conflicts in files**:
-   - Open the conflicting file(s) in your editor
-   - Look for conflict markers `<<<<<<<`, `=======`, and `>>>>>>>`
-   - Edit the file to resolve the conflicts, keeping the desired changes
-   - Remove the conflict markers after resolution
-   - For complex files like `undefined_environment_proofer.py`, carefully review both versions to ensure no functionality is lost
-
-3. **After resolving conflicts**:
-   ```bash
-   git add <resolved-file>
-   git commit -m "Resolve merge conflicts in <file>"
-   git push
-   ```
-
-4. **Common conflict scenarios**:
-   - When both branches modify the same part of a file differently
-   - When a file is modified in one branch but deleted in another
-   - When multiple people modify the same file
-
-5. **Best practices**:
-   - Pull the latest changes from main frequently
-   - Keep your feature branches short-lived
-   - Test thoroughly after resolving conflicts
-   - Use `git status` to check which files have conflicts
-
-### 5. Commit Your Changes
-
-1. Stage your changes:
-   ```bash
-   git add <changed-files>
-   # Or stage all changes with: git add .
-   ```
-
-2. Commit with a descriptive message:
-   ```bash
-   git commit -m "type(scope): description of changes"
-   ```
-
-### 6. Push Changes and Create PR
+### 4. Push Changes and Create PR
 
 1. Push your branch to GitHub:
    ```bash
@@ -96,7 +76,11 @@ When working with feature branches, you might encounter merge conflicts. Here's 
    gh pr create --title "type(scope): description" --body "## Description\n\nDetailed description of changes\n\n### Changes\n- [x] Change 1\n- [x] Change 2" --base main
    ```
 
-3. Address any review comments and update the PR as needed
+3. **Check for PR Status Messages**
+   - Look for any conflict warnings or required checks
+   - Address any issues before requesting review
+
+4. Address any review comments and update the PR as needed
 
 ## Code Style
 
