@@ -7,17 +7,13 @@ This specialist tool analyzes LaTeX compilation logs for "Environment ... undefi
 errors and provides detailed information about the undefined environment.
 """
 
-import json
-import re
-import sys
-import os
-from typing import Dict, Optional, List, Any
-import re
-import json
-import os
-import sys
 import argparse
-from dataclasses import dataclass, field
+import json
+import os
+import re
+import sys
+from typing import Any, Dict, List, Optional
+
 from pydantic import Field
 from smart_pandoc_debugger.data_model import ActionableLead as BaseActionableLead, SourceContextSnippet
 

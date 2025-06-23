@@ -46,7 +46,6 @@ COMMAND_PACKAGES: Dict[str, str] = {
     '\\rotatebox': 'graphicx',
     '\\scalebox': 'graphicx',
     '\\resizebox': 'graphicx',
-    '\\includegraphics': 'graphicx',
     
     # Tables
     '\\toprule': 'booktabs',
@@ -286,9 +285,6 @@ def main():
             'message': f"Failed to process log file: {str(e)}"
         }))
         sys.exit(1)
-
-if __name__ == "__main__":
-    main()
 
 if __name__ == "__main__":
     main()
