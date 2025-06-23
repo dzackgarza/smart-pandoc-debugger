@@ -89,9 +89,18 @@ def test_report_unexpected_closing_curly_brace_in_snippet():
         "error_type_detail": "CurlyBraces"
     }
     output = run_script_with_input(data)
-    assert "Error: Unexpected closing brace '}' found in TeX snippet ' $x^2}$ '." in output
-    assert "Check for an extra '}' or a missing opening '$' in your Markdown." in output
-    assert "Hint: Verify brace balancing in your TeX source." in output
+    # Updated to reflect generalized message after script refactoring
+    expected_error_desc = "Error: Unbalanced brace in TeX snippet ' $x^2}$ ' — a closing '}' is present without a matching opening '{'. Check for an extra '}' or a missing '{'."
+    assert expected_error_desc in output
+
+    expected_hint = "Hint: Check for missing or extra braces '{' or '}' in your TeX math expression. Usually this means a similar issue exists in your Markdown math."
+    assert expected_hint in output # This is the generic hint now
+
+    # Ensure old specific messages/hints are NOT there
+    assert "Error: Unexpected closing brace '}' found in TeX snippet ' $x^2}$ '." not in expected_error_desc # The start of the message changed
+    assert "Check for an extra '}' or a missing opening '$' in your Markdown." not in output
+    assert "Verify brace balancing in your TeX source." not in output
+
 
 def test_report_unexpected_closing_parenthesis_in_snippet_no_special_handling():
     """Test that the special '}' check does not apply to other delimiter types."""
@@ -122,10 +131,10 @@ def test_report_invalid_count_data_for_parentheses():
         "error_type_detail": "Parentheses"
     }
     output = run_script_with_input(data)
-    assert "Error: Unbalanced parenthesis issue detected in TeX snippet 'Some ( text'." in output
-    assert "parenthesis count data was invalid." in output
-    assert "Parentheses counts: one open '(' vs 0 close ')'" in output
-    assert "Hint: Check for missing or extra parentheses '(' or ')' in your TeX math expression." in output
+    # Updated assertion to match the actual, more informative error message
+    assert "Error: Unbalanced parenthesis in TeX snippet 'Some ( text' — parenthesis count data was invalid." in output
+    assert "Parentheses counts: one open '(' vs 0 close ')'" in output # This part was fine
+    assert "Hint: Check for missing or extra parentheses '(' or ')' in your TeX math expression." in output # This part was fine
 
 def test_report_unknown_line_number_default_type():
     """Test with unknown line number, defaulting to CurlyBraces."""

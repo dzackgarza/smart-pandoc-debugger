@@ -34,7 +34,7 @@ def process_lines(input_stream, source_name="input"):
     Processes lines from an input stream (file or stdin) to find unbalanced delimiters.
     Returns True if an error was found and printed, False otherwise.
     """
-    error_found = False
+    found_errors_list = [] # Collect all errors here
     for i, line_content_raw in enumerate(input_stream):
         line_number = i + 1 # Line number is relative to the start of the input_stream
         line_content_raw = line_content_raw.rstrip('\n')
@@ -62,17 +62,15 @@ def process_lines(input_stream, source_name="input"):
                     error_type = f"Unbalanced{name}"
                     problem_snippet = segment_to_check
                     
-                    # Output: ErrorType:LineNum:OpenCount:CloseCount:ProblemSnippet:OriginalLineContent
-                    # LineNum is relative to the input block.
-                    print(f"{error_type}:{line_number}:{open_count}:{close_count}:{problem_snippet}:{line_content_raw}")
-                    error_found = True
-                    return error_found # Exit processing after first error
+                    error_message = f"{error_type}:{line_number}:{open_count}:{close_count}:{problem_snippet}:{line_content_raw}"
+                    found_errors_list.append(error_message)
+                    # Do not return or exit; continue checking for more errors.
 
-        # This break is theoretically unreachable if an error is found due to the return inside the loop.
-        # Kept for logical clarity if the return is ever removed.
-        if error_found:
-            break
-    return error_found
+    # After checking all lines and regions, print all found errors.
+    for error_msg in found_errors_list:
+        print(error_msg)
+
+    return bool(found_errors_list) # Return True if any errors were found
 
 def main():
     # Script exits with 0 if an error is found and printed (and processing stops),

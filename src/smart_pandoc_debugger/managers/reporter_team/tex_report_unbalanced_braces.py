@@ -42,15 +42,10 @@ def main():
         if open_count > close_count:
             issue_desc = f"an opening '{open_char}' is present but not closed. Add a matching '{close_char}'."
         elif close_count > open_count:
-            # Special handling for '}' in problem_snippet was specific to braces,
-            # Generalize or remove if too specific for a generic delimiter reporter.
-            # For now, let's keep a generalized version of this specific check.
-            if close_char in problem_snippet and error_type_detail == "CurlyBraces": # Retain original specific behavior for '}'
-                print(f"Error: Unexpected closing brace '}}' found in TeX snippet '{problem_snippet}'. Check for an extra '}}' or a missing opening '$' in your Markdown.")
-                hint_text = "Verify brace balancing in your TeX source. If math delimiters are also suspect, ensure they are correctly paired in Markdown."
-                main_error_printed = True
-            else:
-                issue_desc = f"a closing '{close_char}' is present without a matching opening '{open_char}'. Check for an extra '{close_char}' or a missing '{open_char}'."
+            # Generalized message for all delimiter types per PR comment
+            issue_desc = f"a closing '{close_char}' is present without a matching opening '{open_char}'. Check for an extra '{close_char}' or a missing '{open_char}'."
+            # The generic hint_text defined earlier is already suitable.
+            # No need for main_error_printed = True here, will fall through to standard print.
         elif open_count == close_count and open_count > 0:
              issue_desc = f"{delim_name_plural} counts ({open_count} vs {close_count}) are equal but reported as unbalanced. This might be a checker issue."
         else: # Should ideally not be hit if counts are different
