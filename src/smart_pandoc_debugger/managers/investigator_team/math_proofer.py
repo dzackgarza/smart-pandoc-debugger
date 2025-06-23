@@ -38,7 +38,21 @@ UNMATCHED_INLINE_MATH_SCRIPT = os.path.join(TEX_PROOFER_TEAM_DIR, "check_unmatch
 
 
 def _run_specialist_script(script_path: str, tex_file: str) -> Optional[str]:
-    """Runs a specialist script and returns its stdout if it finds an error."""
+    """
+    Runs a specialist script and returns its stdout if it finds an error.
+    
+    Args:
+        script_path: Path to the specialist validation script
+        tex_file: Path to the TeX file to validate
+        
+    Returns:
+        String output if validation error found, None if no errors or script failure
+        
+    Note:
+        - Return code 0 with stdout indicates validation error found
+        - Return code != 0 indicates script execution failure (not validation error)
+        - No stdout means no validation issues detected
+    """
     if not os.path.exists(script_path):
         logger.warning(f"Specialist script not found: {script_path}")
         return None
@@ -54,6 +68,7 @@ def _run_specialist_script(script_path: str, tex_file: str) -> Optional[str]:
             logger.debug(f"Math specialist '{os.path.basename(script_path)}' found an issue: {process.stdout.strip()}")
             return process.stdout.strip()
         elif process.returncode != 0:
+            # Non-zero exit code indicates script failure, not a validation error
             logger.error(f"Math specialist '{os.path.basename(script_path)}' failed with rc={process.returncode}. Stderr: {process.stderr.strip()}")
             return None
     except subprocess.TimeoutExpired:
