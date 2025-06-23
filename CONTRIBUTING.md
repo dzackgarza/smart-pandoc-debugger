@@ -31,6 +31,7 @@ Thank you for your interest in contributing! This document outlines the essentia
 
 The pre-commit hook automatically handles:
 - ✅ **Code style** (PEP8, line length, formatting)
+- ✅ **Modular design** (max 300 total lines OR 200 code lines per file)
 - ✅ **Test coverage** requirements 
 - ✅ **Quality checks** (type hints, docstrings)
 - ✅ **Test execution** (all MVP tests must pass)
@@ -98,6 +99,7 @@ The pre-commit hook enforces all code standards automatically. Just follow:
 - Write clear, tested code
 - Add docstrings to public functions
 - Use type hints
+- Keep files modular (≤200 actual code lines, ≤300 total lines)
 - Keep functions focused and small
 
 ## Testing
