@@ -33,11 +33,14 @@ TEX_PROOFER_TEAM_DIR = os.path.dirname(os.path.abspath(__file__))
 UNBALANCED_BRACES_SCRIPT = os.path.join(TEX_PROOFER_TEAM_DIR, "tex_proofer_team", "check_tex_unbalanced_braces.py")
 PAIRED_DELIMITERS_SCRIPT = os.path.join(TEX_PROOFER_TEAM_DIR, "tex_proofer_team", "check_tex_paired_delimiters.py")
 MATH_PROOFER_SCRIPT = os.path.join(TEX_PROOFER_TEAM_DIR, "math_proofer.py")
+CITATION_PROOFER_SCRIPT = os.path.join(TEX_PROOFER_TEAM_DIR, "citation_proofer.py")
 
 
 def _run_specialist_script(script_path: str, tex_file: str) -> Optional[str]:
     """Runs a specialist script and returns its stdout if it finds an error."""
-    assert os.path.exists(script_path), f"Specialist script not found: {script_path}"
+    if not os.path.exists(script_path):
+        logger.warning(f"Specialist script not found: {script_path}")
+        return None
     command = [sys.executable, script_path, tex_file]
     try:
         process = subprocess.run(command, capture_output=True, text=True, check=False, timeout=10)
@@ -129,6 +132,59 @@ def _run_math_proofer(tex_file_path: str) -> Optional[ActionableLead]:
     return None
 
 
+def _run_citation_proofer(tex_file_path: str) -> Optional[ActionableLead]:
+    """
+    Run the comprehensive citation proofer and return parsed result.
+    
+    Args:
+        tex_file_path: Path to the TeX file to validate for citation issues.
+        
+    Returns:
+        ActionableLead if citation issues are found, None otherwise.
+        
+    Expected Output Format:
+        The citation proofer script returns structured output on stdout when issues are found:
+        - Exit code 1 with stdout indicates validation error found
+        - First line: "Citation issue found: <description>"
+        - Subsequent lines: Additional context and location information
+        - Exit code 0 indicates no issues found
+        - Non-zero exit code (other than 1) indicates script execution failure
+    """
+    if not os.path.exists(CITATION_PROOFER_SCRIPT):
+        logger.debug("Citation proofer script not found, skipping citation checks")
+        return None
+        
+    command = [sys.executable, CITATION_PROOFER_SCRIPT, tex_file_path]
+    try:
+        process = subprocess.run(command, capture_output=True, text=True, check=False, timeout=15)
+        if process.returncode == 1 and process.stdout:
+            # Citation proofer found an issue
+            logger.debug(f"Citation proofer found an issue: {process.stdout.strip()}")
+            # The citation proofer outputs its own ActionableLead description
+            lines = process.stdout.strip().split('\n')
+            problem_desc = lines[0].replace("Citation issue found: ", "") if lines else "Citation validation issue found"
+            
+            snippet_text = "\n".join(lines[1:]) if len(lines) > 1 else "See citation proofer output for details"
+            snippet = SourceContextSnippet(
+                source_document_type="generated_tex",
+                central_line_number=1,  # Default, could be parsed from output
+                snippet_text=snippet_text
+            )
+            
+            return ActionableLead(
+                source_service="TexProofer_CitationValidator",
+                problem_description=problem_desc,
+                primary_context_snippets=[snippet],
+                internal_details_for_oracle={"error_signature_code_from_tool": "LATEX_CITATION_VALIDATION_ERROR"}
+            )
+    except subprocess.TimeoutExpired:
+        logger.error("Citation proofer timed out")
+    except Exception as e:
+        logger.error(f"Error running citation proofer: {e}")
+    
+    return None
+
+
 def run_tex_proofer(tex_file_path: str) -> Optional[ActionableLead]:
     """
     Runs various TeX proofing specialists on a TeX file.
@@ -140,6 +196,11 @@ def run_tex_proofer(tex_file_path: str) -> Optional[ActionableLead]:
         ActionableLead if any issues are found, None otherwise.
     """
     logger.debug(f"TexProofer: Running specialists on {tex_file_path}")
+
+    # --- Run Citation Proofer (Branch 6 Implementation) ---
+    citation_result = _run_citation_proofer(tex_file_path)
+    if citation_result:
+        return citation_result
 
     # --- Run Math Proofer (Branch 2 Implementation) ---
     math_result = _run_math_proofer(tex_file_path)
