@@ -263,3 +263,40 @@ class TestRoadmapProgress(TestBase):
                 status, "complete",
                 f"{branch} is marked as {status} but should be complete"
             )
+
+
+class TestDocumentationUpdates(TestBase, unittest.TestCase):
+    """Test cases for documentation updates in the V1.0 roadmap."""
+
+    def test_branch11_documentation_updates(self):
+        """Test that documentation updates meet requirements."""
+        # Test that CONTRIBUTING.md exists and is not empty
+        project_root = Path(__file__).parent.parent.parent
+        contributing_path = project_root / "CONTRIBUTING.md"
+        self.assertTrue(contributing_path.exists(), f"CONTRIBUTING.md does not exist at {contributing_path}")
+        self.assertGreater(contributing_path.stat().st_size, 0, "CONTRIBUTING.md is empty")
+        
+        # Test that CONTRIBUTING.md has all required sections
+        required_sections = [
+            "Development Workflow",
+            "Branch Naming",
+            "Commit Messages",
+            "Code Style",
+            "Testing",
+            "Documentation",
+            "Dependencies",
+            "Pull Requests",
+            "Code Review"
+        ]
+        
+        content = contributing_path.read_text(encoding="utf-8")
+        
+        for section in required_sections:
+            self.assertIn(
+                f"## {section}", 
+                content, 
+                f"Missing section in CONTRIBUTING.md: {section}"
+            )
+        
+        # If we get here, all tests passed
+        return True
