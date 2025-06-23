@@ -32,6 +32,7 @@ if not logger.handlers:
 TEX_PROOFER_TEAM_DIR = os.path.dirname(os.path.abspath(__file__))
 UNBALANCED_BRACES_SCRIPT = os.path.join(TEX_PROOFER_TEAM_DIR, "tex_proofer_team", "check_tex_unbalanced_braces.py")
 PAIRED_DELIMITERS_SCRIPT = os.path.join(TEX_PROOFER_TEAM_DIR, "tex_proofer_team", "check_tex_paired_delimiters.py")
+MATH_PROOFER_SCRIPT = os.path.join(TEX_PROOFER_TEAM_DIR, "math_proofer.py")
 
 
 def _run_specialist_script(script_path: str, log_file: str) -> Optional[str]:
@@ -90,11 +91,55 @@ def _parse_mismatched_delimiters(output: str) -> ActionableLead:
     )
 
 
+def _run_math_proofer(tex_file_path: str) -> Optional[ActionableLead]:
+    """Run the comprehensive math proofer and return parsed result."""
+    if not os.path.exists(MATH_PROOFER_SCRIPT):
+        logger.debug("Math proofer script not found, skipping math checks")
+        return None
+        
+    command = [sys.executable, MATH_PROOFER_SCRIPT, tex_file_path]
+    try:
+        process = subprocess.run(command, capture_output=True, text=True, check=False, timeout=15)
+        if process.returncode == 1 and process.stdout:
+            # Math proofer found an issue
+            logger.debug(f"Math proofer found an issue: {process.stdout.strip()}")
+            # The math proofer outputs its own ActionableLead description, so we parse it
+            # For now, create a basic lead - could be enhanced to parse structured output
+            lines = process.stdout.strip().split('\n')
+            problem_desc = lines[0].replace("Math issue found: ", "") if lines else "Math validation issue found"
+            
+            snippet_text = "\n".join(lines[1:]) if len(lines) > 1 else "See math proofer output for details"
+            snippet = SourceContextSnippet(
+                source_document_type="generated_tex",
+                central_line_number=1,  # Default, could be parsed from output
+                snippet_text=snippet_text
+            )
+            
+            return ActionableLead(
+                source_service="TexProofer_MathValidator",
+                problem_description=problem_desc,
+                primary_context_snippets=[snippet],
+                internal_details_for_oracle={"error_signature_code_from_tool": "LATEX_MATH_VALIDATION_ERROR"}
+            )
+    except subprocess.TimeoutExpired:
+        logger.error("Math proofer timed out")
+    except Exception as e:
+        logger.error(f"Error running math proofer: {e}")
+    
+    return None
+
+
 def run_tex_proofer(log_file_path: str) -> Optional[ActionableLead]:
     """
     Runs various TeX proofing specialists.
+    Note: log_file_path is actually used as tex_file_path for direct TeX analysis.
     """
     logger.debug(f"TexProofer: Running specialists on {log_file_path}")
+
+    # --- Run Math Proofer (Branch 2 Implementation) ---
+    math_result = _run_math_proofer(log_file_path)
+    if math_result:
+        return math_result
 
     # --- Run Unbalanced Braces Proofer ---
     unbalanced_output = _run_specialist_script(UNBALANCED_BRACES_SCRIPT, log_file_path)
