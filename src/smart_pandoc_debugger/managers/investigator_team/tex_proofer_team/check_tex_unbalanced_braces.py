@@ -5,7 +5,7 @@ import re
 def find_math_regions(line_content):
     """
     Finds regions in a line that are likely LaTeX math environments
-    \(...\) or \[...\]. Returns a list of (start_index, end_index, content) tuples.
+    \\(...\\) or \\[...\\] (e.g. \\( ... \\) or \\[ ... \\]). Returns a list of dicts.
     This is a simple heuristic and might not cover all complex cases or nested scenarios.
     """
     regions = []
@@ -18,69 +18,90 @@ def find_math_regions(line_content):
     for m in re.finditer(r"\\\[.*?\\\]", line_content): # Non-greedy match
         regions.append({"type": "display", "start": m.start(), "end": m.end(), "content": m.group(0)})
     
-    # If no explicit math envs, but line contains relevant commands, consider whole line
-    if not regions and re.search(r'\\left|\\right|\\frac|\\sqrt|\\sum|\\int|\\text\{|\\label\{', line_content):
+    # If no explicit math envs, but line contains relevant commands or common delimiters, consider whole line.
+    # Added \{, \}, \[, \], \(, \) to the heuristic pattern.
+    # Ensured to escape regex special characters like [, ], (, ).
+    heuristic_pattern = r'\\left|\\right|\\frac|\\sqrt|\\sum|\\int|\\text\{|\\label\{|\{|\}|\\\[|\\\]|\\\(|\\\)'
+    if not regions and re.search(heuristic_pattern, line_content):
          regions.append({"type": "heuristic_math_line", "start": 0, "end": len(line_content), "content": line_content})
 
     # Sort by start position to process in order
     regions.sort(key=lambda r: r["start"])
     return regions
 
-def main():
-    if len(sys.argv) < 2:
-        print("Usage: python3 check_tex_unbalanced_braces.py <tex_file>", file=sys.stderr)
-        sys.exit(2)
-
-    filepath = sys.argv[1]
+def process_lines(input_stream, source_name="input"):
+    """
+    Processes lines from an input stream (file or stdin) to find unbalanced delimiters.
+    Returns True if an error was found and printed, False otherwise.
+    """
     error_found = False
+    for i, line_content_raw in enumerate(input_stream):
+        line_number = i + 1 # Line number is relative to the start of the input_stream
+        line_content_raw = line_content_raw.rstrip('\n')
 
-    try:
-        with open(filepath, 'r', encoding='utf-8') as f:
-            for i, line_content_raw in enumerate(f):
-                line_number = i + 1
-                line_content_raw = line_content_raw.rstrip('\n')
+        math_regions = find_math_regions(line_content_raw)
 
-                math_regions = find_math_regions(line_content_raw)
+        if not math_regions:
+            # find_math_regions includes a heuristic for full line if specific math regions aren't found.
+            pass
 
-                if not math_regions: # Only check lines with identified math or math-related commands
-                    # Check the whole line if it looks like it might contain math commands
-                    # This is similar to the awk script's initial line filter.
-                    # Redundant if find_math_regions already adds heuristic_math_line
-                    # if not re.search(r'\\\(|\\\[|\\left|\\right|\\begin\{equation\}|\\frac|\\sqrt|\\sum|\\int|\\text\{|\\label\{', line_content_raw):
-                    #    continue # Skip lines unlikely to contain relevant brace issues
-                    pass # find_math_regions includes a heuristic for full line if specific math regions aren't found
+        for region in math_regions:
+            segment_to_check = region["content"]
 
-                for region in math_regions:
-                    segment_to_check = region["content"]
+            delimiters = [
+                ('{', '}', 'CurlyBraces'),
+                ('(', ')', 'Parentheses'),
+                ('[', ']', 'SquareBrackets')
+            ]
+
+            for open_delim, close_delim, name in delimiters:
+                open_count = segment_to_check.count(open_delim)
+                close_count = segment_to_check.count(close_delim)
+
+                if open_count != close_count:
+                    error_type = f"Unbalanced{name}"
+                    problem_snippet = segment_to_check
                     
-                    # Count non-escaped { and }
-                    # Python's re.findall is good for this.
-                    # To find '{' not preceded by '\', use negative lookbehind `(?<!\\){`
-                    # For TeX, `\{` is a literal brace, so we just count raw `{` and `}`.
-                    open_braces = segment_to_check.count('{')
-                    close_braces = segment_to_check.count('}')
+                    # Output: ErrorType:LineNum:OpenCount:CloseCount:ProblemSnippet:OriginalLineContent
+                    # LineNum is relative to the input block.
+                    print(f"{error_type}:{line_number}:{open_count}:{close_count}:{problem_snippet}:{line_content_raw}")
+                    error_found = True
+                    return error_found # Exit processing after first error
 
-                    if open_braces != close_braces:
-                        error_type = "UnbalancedBraces"
-                        problem_snippet = segment_to_check # The math region itself is the best snippet
-                        
-                        # Output: ErrorType:LineNum:OpenCount:CloseCount:ProblemSnippet:OriginalLineContent
-                        print(f"{error_type}:{line_number}:{open_braces}:{close_braces}:{problem_snippet}:{line_content_raw}")
-                        error_found = True
-                        sys.exit(0) # Exit after first error region on the first error line
-                
-                if error_found: # Should have been caught by sys.exit(0) in loop
-                    break
+        # This break is theoretically unreachable if an error is found due to the return inside the loop.
+        # Kept for logical clarity if the return is ever removed.
+        if error_found:
+            break
+    return error_found
 
-    except FileNotFoundError:
-        print(f"Error: TeX file not found: {filepath}", file=sys.stderr)
-        sys.exit(2)
-    except Exception as e:
-        print(f"Error processing file {filepath}: {e}", file=sys.stderr)
-        sys.exit(2)
+def main():
+    # Script exits with 0 if an error is found and printed (and processing stops),
+    # or if no errors are found after processing all input.
+    # Script exits with 2 for argument or file errors.
 
-    if not error_found:
-        sys.exit(0)
+    if len(sys.argv) > 1:
+        filepath = sys.argv[1]
+        if filepath == "-": # Explicitly use stdin if "-" is given as argument
+            process_lines(sys.stdin, source_name="stdin")
+            sys.exit(0) # Assume sys.exit(0) is desired after processing stdin, error or not.
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                if process_lines(f, source_name=filepath):
+                    sys.exit(0) # Error found and printed by process_lines
+                else:
+                    sys.exit(0) # No error found
+        except FileNotFoundError:
+            print(f"Error: TeX file not found: {filepath}", file=sys.stderr)
+            sys.exit(2)
+        except Exception as e:
+            print(f"Error processing file {filepath}: {e}", file=sys.stderr)
+            sys.exit(2)
+    else:
+        # Read from stdin if no file argument is provided
+        if process_lines(sys.stdin, source_name="stdin"):
+            sys.exit(0) # Error found and printed
+        else:
+            sys.exit(0) # No error found
 
 if __name__ == "__main__":
     main()

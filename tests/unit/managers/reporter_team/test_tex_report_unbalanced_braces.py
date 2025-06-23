@@ -1,119 +1,147 @@
 # tests/unit/managers/reporter_team/test_tex_report_unbalanced_braces.py
 import pytest
-from smart_pandoc_debugger.data_model import ActionableLead, LeadTypeEnum, MarkdownRemedy, SourceContextSnippet
-# from managers.reporter_team.tex_report_unbalanced_braces import format_report_section # Example
+import json
+import io
+import sys
+from unittest.mock import patch
 
-@pytest.fixture
-def lead_unbalanced_braces():
-    return ActionableLead(
-        lead_id="UB001",
-        lead_type=LeadTypeEnum.LATEX_UNBALANCED_BRACES,
-        problem_description="Unbalanced braces: Missing '}'",
-        source_service="Investigator", # Added
-        line_number_start=15,
-        # relevant_code_snippet is not a direct field, context is in primary_context_snippets
-        # For simplicity of this fix, I'll remove relevant_code_snippet and source_manager for now
-        # and assume the test logic will be adapted or it's part of primary_context_snippets
-        primary_context_snippets=[SourceContextSnippet(source_document_type='tex_compilation_log', snippet_text="Text with { an open brace but no close")]
-    )
+# Assuming the script is in the correct path to be imported
+from smart_pandoc_debugger.managers.reporter_team.tex_report_unbalanced_braces import main as trub_main
 
-@pytest.fixture
-def lead_unbalanced_braces_with_remedy(lead_unbalanced_braces):
-    remedy = MarkdownRemedy(
-        associated_lead_id="UB001", # Matches lead_id above
-        description="Ensure every '{' has a matching '}'.",
-        suggested_markdown_change="Text with { an open brace but no close}" # Corrected version
-    )
-    return lead_unbalanced_braces, [remedy]
+# Helper function to run the script's main() with mocked stdin/stdout
+def run_script_with_input(json_data):
+    """Runs the tex_report_unbalanced_braces script's main function with the given JSON data."""
+    # Prepare the JSON input string
+    input_str = json.dumps(json_data)
+
+    # Mock stdin, stdout, and argv
+    # No argv needed as script reads from stdin when no args
+    with patch('sys.stdin', io.StringIO(input_str)):
+        with patch('sys.stdout', new_callable=io.StringIO) as mock_stdout:
+            try:
+                trub_main()
+            except SystemExit as e:
+                # The script calls sys.exit(). We can check the exit code if needed.
+                # For these tests, we are primarily interested in stdout.
+                # Pass if exit code is 0, otherwise raise to see the error.
+                if e.code != 0 and e.code is not None: # None can happen if main completes without exit
+                    raise
+            return mock_stdout.getvalue()
+
+def test_report_missing_closing_curly_brace_default_type():
+    """Test report for a missing closing curly brace (default error_type_detail)."""
+    data = {
+        "line_number": "15",
+        "problem_snippet": "Text with { an open brace",
+        "line_content_raw": "Full line: Text with { an open brace but no close",
+        "open_count": "1",
+        "close_count": "0"
+        # No "error_type_detail", defaults to CurlyBraces
+    }
+    output = run_script_with_input(data)
+
+    assert "Error: Unbalanced brace in TeX snippet 'Text with { an open brace'" in output
+    assert "an opening '{' is present but not closed. Add a matching '}'." in output
+    assert "Braces counts: 1 open '{' vs 0 close '}'" in output
+    assert "Hint: Check for missing or extra braces '{' or '}' in your TeX math expression." in output
+
+def test_report_missing_closing_parenthesis():
+    """Test report for a missing closing parenthesis."""
+    data = {
+        "line_number": "16",
+        "problem_snippet": "Text with ( an open paren",
+        "line_content_raw": "Full line: Text with ( an open paren but no close",
+        "open_count": "1",
+        "close_count": "0",
+        "error_type_detail": "Parentheses"
+    }
+    output = run_script_with_input(data)
+
+    assert "Error: Unbalanced parenthesis in TeX snippet 'Text with ( an open paren'" in output
+    assert "an opening '(' is present but not closed. Add a matching ')'." in output
+    assert "Parentheses counts: 1 open '(' vs 0 close ')'" in output
+    assert "Hint: Check for missing or extra parentheses '(' or ')' in your TeX math expression." in output
+
+def test_report_missing_opening_square_bracket():
+    """Test report for a missing opening square bracket."""
+    data = {
+        "line_number": "20",
+        "problem_snippet": "Text with an extra ]",
+        "line_content_raw": "Full line: Text with an extra ] bracket",
+        "open_count": "0",
+        "close_count": "1",
+        "error_type_detail": "SquareBrackets"
+    }
+    output = run_script_with_input(data)
+    assert "Error: Unbalanced square bracket in TeX snippet 'Text with an extra ]'" in output
+    assert "a closing ']' is present without a matching opening '['. Check for an extra ']' or a missing '['." in output
+    assert "Square brackets counts: 0 open '[' vs 1 close ']'" in output
+    assert "Hint: Check for missing or extra square brackets '[' or ']' in your TeX math expression." in output
+
+def test_report_unexpected_closing_curly_brace_in_snippet():
+    """Test specific handling for '}' in problem_snippet when type is CurlyBraces."""
+    data = {
+        "line_number": "25",
+        "problem_snippet": " $x^2}$ ",
+        "line_content_raw": "Math: $x^2}$ should be $x^{2}$",
+        "open_count": "0",
+        "close_count": "1",
+        "error_type_detail": "CurlyBraces"
+    }
+    output = run_script_with_input(data)
+    assert "Error: Unexpected closing brace '}' found in TeX snippet ' $x^2}$ '." in output
+    assert "Check for an extra '}' or a missing opening '$' in your Markdown." in output
+    assert "Hint: Verify brace balancing in your TeX source." in output
+
+def test_report_unexpected_closing_parenthesis_in_snippet_no_special_handling():
+    """Test that the special '}' check does not apply to other delimiter types."""
+    data = {
+        "line_number": "26",
+        "problem_snippet": " $x^2)$ ",
+        "line_content_raw": "Math: $x^2)$ should be $x^{2}$",
+        "open_count": "0",
+        "close_count": "1",
+        "error_type_detail": "Parentheses"
+    }
+    output = run_script_with_input(data)
+    assert "Error: Unbalanced parenthesis in TeX snippet ' $x^2)$ '" in output
+    assert "a closing ')' is present without a matching opening '('. Check for an extra ')' or a missing '('." in output
+    # Ensure the special hint for '}' is not present
+    assert "Verify brace balancing in your TeX source." not in output
+    assert "Hint: Check for missing or extra parentheses '(' or ')' in your TeX math expression." in output
 
 
-def test_trub_formats_lead_correctly(lead_unbalanced_braces):
-    """Test basic formatting of an unbalanced braces lead."""
-    # section = format_report_section([lead_unbalanced_braces], []) # SUT
-    # assert "Unbalanced Braces Issue" in section
-    # assert "Missing '}'" in section
-    # assert "Line: 15" in section
-    # assert "Code: `Text with { an open brace but no close`" in section
-    # assert "Source: Investigator" in section
-    pass
+def test_report_invalid_count_data_for_parentheses():
+    """Test report when count data is not valid for parentheses."""
+    data = {
+        "line_number": "30",
+        "problem_snippet": "Some ( text",
+        "line_content_raw": "Some ( text with invalid count",
+        "open_count": "one",
+        "close_count": "0",
+        "error_type_detail": "Parentheses"
+    }
+    output = run_script_with_input(data)
+    assert "Error: Unbalanced parenthesis issue detected in TeX snippet 'Some ( text'." in output
+    assert "parenthesis count data was invalid." in output
+    assert "Parentheses counts: one open '(' vs 0 close ')'" in output
+    assert "Hint: Check for missing or extra parentheses '(' or ')' in your TeX math expression." in output
 
-def test_trub_formats_lead_with_remedy(lead_unbalanced_braces_with_remedy):
-    """Test formatting when a remedy is available."""
-    # lead, remedies = lead_unbalanced_braces_with_remedy
-    # section = format_report_section([lead], remedies) # SUT
-    # assert "Suggested Fix" in section
-    # assert "Ensure every '{' has a matching '}'." in section
-    # assert "Suggested Change:" in section
-    # assert "```\nText with { an open brace but no close}\n```" in section
-    pass
+def test_report_unknown_line_number_default_type():
+    """Test with unknown line number, defaulting to CurlyBraces."""
+    data = {
+        "line_number": "unknown",
+        "problem_snippet": "{",
+        "line_content_raw": "A line with { issues",
+        "open_count": "2", # Deliberate mismatch with snippet for test
+        "close_count": "1"
+        # "error_type_detail": "CurlyBraces" (default)
+    }
+    output = run_script_with_input(data)
+    assert "Error: Unbalanced brace in TeX snippet '{'" in output
+    assert "an opening '{' is present but not closed. Add a matching '}'." in output
+    assert "Line number (TeX): unknown" in output
+    assert "Braces counts: 2 open '{' vs 1 close '}'" in output
 
-def test_trub_handles_multiple_leads(lead_unbalanced_braces):
-    """Test formatting for multiple unbalanced brace leads."""
-    # lead2 = ActionableLead(lead_id="UB002", lead_type=LeadTypeEnum.LATEX_UNBALANCED_BRACES, description="Another brace issue", line_number_start=20)
-    # section = format_report_section([lead_unbalanced_braces, lead2], []) # SUT
-    # assert "Missing '}'" in section
-    # assert "Another brace issue" in section
-    # assert section.count("Unbalanced Braces Issue") >= 1
-    pass
-
-def test_trub_no_output_if_no_relevant_leads():
-    """Test that no section is generated if there are no unbalanced brace leads."""
-    # other_lead = ActionableLead(lead_type=LeadTypeEnum.LATEX_UNDEFINED_COMMAND, description="...")
-    # section = format_report_section([other_lead], []) # SUT
-    # assert section.strip() == ""
-    pass
-
-def test_trub_handles_lead_with_no_line_number(lead_unbalanced_braces):
-    """Test formatting if line number is missing from the lead."""
-    # lead_unbalanced_braces.line_number_start = None
-    # section = format_report_section([lead_unbalanced_braces], []) # SUT
-    # assert "Line: Not available" in section or "Line:" not in section
-    pass
-
-def test_trub_handles_lead_with_no_snippet(lead_unbalanced_braces):
-    """Test formatting if code snippet is missing."""
-    # lead_unbalanced_braces.relevant_code_snippet = None
-    # section = format_report_section([lead_unbalanced_braces], []) # SUT
-    # assert "Code: Not available" in section or "Code:" not in section
-    pass
-
-def test_trub_handles_remedy_not_associated_with_lead(lead_unbalanced_braces):
-    """Test behavior if a remedy exists but its ID doesn't match the lead."""
-    # remedy_other = MarkdownRemedy(associated_lead_id="OTHER01", description="Fix for other thing")
-    # section = format_report_section([lead_unbalanced_braces], [remedy_other]) # SUT
-    # assert "Suggested Fix" not in section
-    pass
-
-def test_trub_markdown_structure_of_output(lead_unbalanced_braces_with_remedy): # Added fixture
-    """Check for valid Markdown in the output section (e.g. headings, code blocks)."""
-    # lead, remedies = lead_unbalanced_braces_with_remedy
-    # section = format_report_section([lead], remedies) # SUT
-    # assert "### Unbalanced Braces Issue" in section
-    # assert "```" in section
-    pass
-
-def test_trub_consistency_in_terminology(lead_unbalanced_braces): # Added fixture
-    """Ensure consistent terms like 'Line', 'Code', 'Suggested Fix' are used."""
-    # section = format_report_section([lead_unbalanced_braces], [])
-    # assert "Line:" in section
-    # assert "Code:" in section
-    pass
-
-def test_trub_empty_leads_list_input():
-    """Test with an empty list of leads."""
-    # section = format_report_section([], []) # SUT
-    # assert section.strip() == ""
-    pass
-
-def test_trub_filters_for_own_lead_type(lead_unbalanced_braces):
-    """Ensure it only processes LATEX_UNBALANCED_BRACES leads."""
-    # mixed_leads = [
-    #    lead_unbalanced_braces,
-    #    ActionableLead(lead_type=LeadTypeEnum.LATEX_UNDEFINED_COMMAND, description="Test")
-    # ]
-    # section = format_report_section(mixed_leads, [])
-    # assert "Unbalanced braces: Missing '}'" in section
-    # assert "Test" not in section # Description of the other lead type
-    pass
-
-# ~11 stubs for a reporter team specialist
+# These tests are now updated to reflect the generic nature of the reporter script
+# when `error_type_detail` is provided.

@@ -2,29 +2,30 @@
 import pytest
 from unittest.mock import patch, MagicMock, call
 from smart_pandoc_debugger.data_model import DiagnosticJob, StatusEnum, ActionableLead, LeadTypeEnum, MarkdownRemedy, UrgencyEnum, SourceContextSnippet
-# import coordinator
+# import coordinator # Assuming coordinator.py is in src/smart_pandoc_debugger
 
 # Test importability
 def test_coordinator_module_importable():
     """Test if coordinator.py can be imported as a module."""
-    # import coordinator # SUT
+    # import smart_pandoc_debugger.Coordinator as coordinator # SUT
     # assert coordinator is not None
     pass
 
 @pytest.fixture
 def initial_diagnostic_job():
     """A fresh DiagnosticJob as if from intake.py."""
-    return DiagnosticJob(case_id="coord_test_job_01", original_markdown_content="# Test Content")
+    # Assuming DiagnosticJob needs original_markdown_path now
+    return DiagnosticJob(case_id="coord_test_job_01", original_markdown_content="# Test Content", original_markdown_path="dummy.md")
 
 @pytest.fixture
 def mock_manager_runner(mocker):
     """Mocks the relevant run_manager function used by coordinator."""
-    return mocker.patch('coordinator.run_manager', create=True)
+    return mocker.patch('smart_pandoc_debugger.Coordinator.run_manager', create=True)
 
 def test_coordinator_runs_miner_first(mock_manager_runner, initial_diagnostic_job):
     """Test that Miner.py is the first manager called."""
     # mock_manager_runner.return_value = initial_diagnostic_job.model_copy()
-    # from coordinator import main as run_coordinator_pipeline # SUT
+    # from smart_pandoc_debugger.Coordinator import main as run_coordinator_pipeline # SUT
     # current_job = initial_diagnostic_job.model_copy()
     # run_coordinator_pipeline(current_job)
     # mock_manager_runner.assert_any_call('Miner.py', current_job)
@@ -49,12 +50,12 @@ def test_coordinator_runs_investigator_if_miner_fails_tex_compilation(mock_manag
     # def manager_runner_side_effect(manager_script, job_input):
     #     if manager_script == 'Miner.py': return miner_output_job
     #     if manager_script == 'Investigator.py': return investigator_output_job
-    #     if manager_script == 'Oracle.py': return investigator_output_job
+    #     if manager_script == 'Oracle.py': return investigator_output_job # Oracle might run
     #     if manager_script == 'Reporter.py': return reporter_output_job
     #     return job_input
     # mock_manager_runner.side_effect = manager_runner_side_effect
     #
-    # from coordinator import main as run_coordinator_pipeline # SUT
+    # from smart_pandoc_debugger.Coordinator import main as run_coordinator_pipeline # SUT
     # run_coordinator_pipeline(current_job)
     #
     # mock_manager_runner.assert_any_call('Miner.py', current_job)
@@ -89,7 +90,7 @@ def test_coordinator_skips_investigator_if_miner_succeeds_or_md_fails(mock_manag
     #         return job_input
     #     mock_manager_runner.side_effect = side_effect
     #
-    #     from coordinator import main as run_coordinator_pipeline # SUT
+    #     from smart_pandoc_debugger.Coordinator import main as run_coordinator_pipeline # SUT
     #     run_coordinator_pipeline(current_job_state)
     #
     #     investigator_called = any(c.args[0] == 'Investigator.py' for c in mock_manager_runner.call_args_list)
@@ -119,7 +120,7 @@ def test_coordinator_runs_oracle_if_leads_exist_and_not_success(mock_manager_run
     #     return job_input
     # mock_manager_runner.side_effect = side_effect
     #
-    # from coordinator import main as run_coordinator_pipeline # SUT
+    # from smart_pandoc_debugger.Coordinator import main as run_coordinator_pipeline # SUT
     # run_coordinator_pipeline(current_job)
     # mock_manager_runner.assert_any_call('Oracle.py', investigator_job)
     pass
@@ -138,7 +139,7 @@ def test_coordinator_skips_oracle_if_no_leads(mock_manager_runner, initial_diagn
     #     if manager_script == 'Oracle.py': pytest.fail("Oracle called when no leads present")
     #     return job_input
     # mock_manager_runner.side_effect = side_effect
-    # from coordinator import main as run_coordinator_pipeline # SUT
+    # from smart_pandoc_debugger.Coordinator import main as run_coordinator_pipeline # SUT
     # run_coordinator_pipeline(current_job)
     # oracle_called = any(c.args[0] == 'Oracle.py' for c in mock_manager_runner.call_args_list)
     # assert not oracle_called
@@ -167,7 +168,7 @@ def test_coordinator_skips_oracle_if_compilation_succeeded_despite_leads(mock_ma
     #     if manager_script == 'Oracle.py': pytest.fail("Oracle called on full success")
     #     return job_input
     # mock_manager_runner.side_effect = side_effect
-    # from coordinator import main as run_coordinator_pipeline # SUT
+    # from smart_pandoc_debugger.Coordinator import main as run_coordinator_pipeline # SUT
     # run_coordinator_pipeline(current_job)
     # oracle_called = any(c.args[0] == 'Oracle.py' for c in mock_manager_runner.call_args_list)
     # assert not oracle_called
@@ -185,7 +186,7 @@ def test_coordinator_always_runs_reporter(mock_manager_runner, initial_diagnosti
     #     return job_input.model_copy(update={'current_pipeline_stage': StatusEnum.ORACLE_PROCESSING.value, 'final_job_outcome': StatusEnum.ORACLE_REMEDIES_GENERATED.value})
     # mock_manager_runner.side_effect = side_effect
     #
-    # from coordinator import main as run_coordinator_pipeline # SUT
+    # from smart_pandoc_debugger.Coordinator import main as run_coordinator_pipeline # SUT
     # final_job = run_coordinator_pipeline(current_job)
     #
     # reporter_call_args = None
@@ -203,12 +204,12 @@ def test_coordinator_passes_updated_job_between_managers(mock_manager_runner, in
     # current_job = initial_diagnostic_job.model_copy()
     # miner_out = current_job.model_copy(update={'current_pipeline_stage': StatusEnum.MINER_PROCESSING.value, 'generated_tex_content': "TeX from Miner", 'md_to_tex_conversion_successful': True, 'tex_to_pdf_compilation_successful': False, 'final_job_outcome': StatusEnum.MINER_TEX_TO_PDF_FAILED.value})
     # invest_out = miner_out.model_copy(update={'current_pipeline_stage': StatusEnum.INVESTIGATOR_PROCESSING.value, 'actionable_leads': [ActionableLead(problem_description="Lead from Invest", source_service="Investigator", lead_type=LeadTypeEnum.LATEX_ERROR, lead_id="L01")] , 'final_job_outcome': StatusEnum.INVESTIGATOR_LEADS_FOUND.value})
-    # oracle_out = invest_out.model_copy(update={'current_pipeline_stage': StatusEnum.ORACLE_PROCESSING.value, 'markdown_remedies': [MarkdownRemedy(associated_lead_id="L01", description="Fix", instruction_for_markdown_fix="Do this", source_service="Oracle", remedy_id="R01")] , 'final_job_outcome': StatusEnum.ORACLE_REMEDIES_GENERATED.value})
+    # oracle_out = invest_out.model_copy(update={'current_pipeline_stage': StatusEnum.ORACLE_PROCESSING.value, 'markdown_remedies': [MarkdownRemedy(associated_lead_id="L01", explanation="Fix", instruction_for_markdown_fix="Do this", source_service="Oracle", applies_to_lead_id="L01", remedy_id="R01")] , 'final_job_outcome': StatusEnum.ORACLE_REMEDIES_GENERATED.value})
     # reporter_out = oracle_out.model_copy(update={'final_job_outcome': StatusEnum.REPORT_GENERATED.value, 'current_pipeline_stage': StatusEnum.REPORTER_PROCESSING.value})
 
     # def side_effect(manager_script, job_input):
     #     if manager_script == 'Miner.py':
-    #         assert job_input.current_pipeline_stage == "Initialized"
+    #         assert job_input.current_pipeline_stage == "Initialized" # or initial_diagnostic_job.current_pipeline_stage
     #         return miner_out
     #     if manager_script == 'Investigator.py':
     #         assert job_input.generated_tex_content == "TeX from Miner"
@@ -221,7 +222,7 @@ def test_coordinator_passes_updated_job_between_managers(mock_manager_runner, in
     #         return reporter_out
     #     return job_input
     # mock_manager_runner.side_effect = side_effect
-    # from coordinator import main as run_coordinator_pipeline # SUT
+    # from smart_pandoc_debugger.Coordinator import main as run_coordinator_pipeline # SUT
     # run_coordinator_pipeline(current_job)
     pass
 
@@ -236,7 +237,7 @@ def test_coordinator_returns_final_diagnostic_job(mock_manager_runner, initial_d
     #     return job_input.model_copy(update={'final_job_outcome': StatusEnum.COMPILATION_SUCCESS.value, 'md_to_tex_conversion_successful':True, 'tex_to_pdf_compilation_successful':True, 'current_pipeline_stage': StatusEnum.ORACLE_PROCESSING.value})
     # mock_manager_runner.side_effect = side_effect_reporter
     #
-    # from coordinator import main as run_coordinator_pipeline # SUT
+    # from smart_pandoc_debugger.Coordinator import main as run_coordinator_pipeline # SUT
     # result_job = run_coordinator_pipeline(current_job)
     # assert result_job.final_user_report_summary == "Report text"
     # assert result_job.final_job_outcome == StatusEnum.REPORT_GENERATED.value
@@ -258,7 +259,7 @@ def test_coordinator_handles_manager_runner_exception(mock_manager_runner, initi
     #
     # mock_manager_runner.side_effect = side_effect_crash
     # import logging
-    # from coordinator import main as run_coordinator_pipeline # SUT
+    # from smart_pandoc_debugger.Coordinator import main as run_coordinator_pipeline # SUT
     #
     # final_job = run_coordinator_pipeline(current_job)
     #
@@ -286,7 +287,7 @@ def test_coordinator_logging_of_pipeline_steps(mock_manager_runner, initial_diag
     #     return job_input.model_copy(update=update_data)
     # mock_manager_runner.side_effect = side_effect_log
     #
-    # from coordinator import main as run_coordinator_pipeline # SUT
+    # from smart_pandoc_debugger.Coordinator import main as run_coordinator_pipeline # SUT
     # with caplog.at_level(logging.INFO):
     #    run_coordinator_pipeline(current_job)
     #
@@ -298,7 +299,7 @@ def test_coordinator_logging_of_pipeline_steps(mock_manager_runner, initial_diag
 
 def test_coordinator_main_function_entry_point(mock_manager_runner, initial_diagnostic_job):
     """Test the main function if it's the primary entry point used by intake."""
-    # from coordinator import main as run_coordinator_pipeline # SUT
+    # from smart_pandoc_debugger.Coordinator import main as run_coordinator_pipeline # SUT
     # run_coordinator_pipeline(initial_diagnostic_job.model_copy())
     # mock_manager_runner.assert_called()
     pass
@@ -329,11 +330,10 @@ def test_coordinator_oracle_bypass_hackathon_mode(mock_manager_runner, initial_d
     #     if manager_script == 'Oracle.py': pytest.fail("Oracle was called in Hackathon mode bypass")
     #     return job_input
     # mock_manager_runner.side_effect = side_effect
-    # from coordinator import main as run_coordinator_pipeline # SUT
+    # from smart_pandoc_debugger.Coordinator import main as run_coordinator_pipeline # SUT
     # run_coordinator_pipeline(current_job)
     # assert "Oracle.py" not in call_log
     # assert call_log == ["Miner.py", "Investigator.py", "Reporter.py"]
     pass
 
 # ~15 stubs for coordinator.py
-# >>>>>>> REPLACE # This was the leftover marker causing SyntaxError
