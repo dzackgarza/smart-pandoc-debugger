@@ -1,1 +1,0 @@
-pandoc-smart-debugger-alternative.py
