@@ -20,7 +20,7 @@ project_root = current_dir.parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from src.smart_pandoc_debugger.managers.investigator_team.citation_proofer import run_citation_proofer
-from src.smart_pandoc_debugger.managers.investigator_team.citation_team.check_pandoc_citations import check_pandoc_citations
+from src.smart_pandoc_debugger.managers.investigator_team.citation_team.check_pandoc_citations import check_pandoc_citations, PandocCitationValidator
 from src.smart_pandoc_debugger.managers.investigator_team.citation_team.check_latex_citations import check_latex_citations
 from src.smart_pandoc_debugger.managers.investigator_team.citation_team.check_bibliography import check_bibliography
 from src.smart_pandoc_debugger.managers.investigator_team.citation_team.check_citation_style import check_citation_style
@@ -131,6 +131,61 @@ This document has citations [@smith2024].
             assert result is not None
             assert "DuplicateCitationKey" in result
             assert "smith2024" in result
+    
+    def test_multiline_bibtex_field_handling(self):
+        """Test that multiline BibTeX field values are handled correctly."""
+        validator = PandocCitationValidator()
+        
+        # Create a BibTeX file with multiline field values and comments
+        multiline_bibtex = '''@article{multiline2024,
+    title = {A Very Long Title That
+             Spans Multiple Lines
+             And Contains Special Characters},
+    author = {Smith, John and
+              Doe, Jane and
+              Brown, Alice},
+    abstract = {This is a long abstract that
+                spans multiple lines and contains
+                nested {braces} and other special
+                characters like % percent signs
+                and "quoted strings"},
+    year = {2024},
+    % This is a comment that should be ignored
+    journal = {Journal of
+               Multiline % Another comment
+               Research}
+}
+
+% A commented out entry that should be ignored
+% @article{commented2024,
+%   title = {This should not be parsed}
+% }
+
+@book{simple2024,
+    title = {Simple Book},
+    author = {Author, Test}
+}'''
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.bib', delete=False) as f:
+            f.write(multiline_bibtex)
+            bib_path = f.name
+        
+        try:
+            # Test that both keys are extracted correctly
+            keys = validator.extract_bib_keys_from_bibtex(bib_path)
+            
+            # Should find both keys despite multiline content
+            assert 'multiline2024' in keys
+            assert 'simple2024' in keys
+            
+            # Should not find the commented out entry
+            assert 'commented2024' not in keys
+            
+            # Total should be exactly 2 keys
+            assert len(keys) == 2
+            
+        finally:
+            os.unlink(bib_path)
 
 
 class TestLatexCitationValidator:

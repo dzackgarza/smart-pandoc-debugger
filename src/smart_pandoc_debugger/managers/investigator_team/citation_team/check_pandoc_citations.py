@@ -59,19 +59,87 @@ class PandocCitationValidator:
         return citations
     
     def extract_bib_keys_from_bibtex(self, bib_file: str) -> Set[str]:
-        """Extract citation keys from a BibTeX file."""
+        """
+        Extract citation keys from a BibTeX file.
+        
+        Uses a robust parser that handles multiline field values by parsing
+        entry boundaries with proper brace counting.
+        """
         keys = set()
         try:
             with open(bib_file, 'r', encoding='utf-8') as f:
                 content = f.read()
                 
-            # Pattern to match BibTeX entries: @article{key,
-            pattern = r'@\w+\s*\{\s*([^,\s]+)\s*,'
-            for match in re.finditer(pattern, content, re.IGNORECASE):
-                keys.add(match.group(1))
+            # Remove comments (lines starting with %)
+            lines = content.splitlines()
+            cleaned_lines = []
+            for line in lines:
+                # Remove inline comments but preserve quoted strings
+                in_string = False
+                escape_next = False
+                cleaned_line = ""
+                for char in line:
+                    if escape_next:
+                        cleaned_line += char
+                        escape_next = False
+                    elif char == '\\':
+                        cleaned_line += char
+                        escape_next = True
+                    elif char == '"' and not escape_next:
+                        in_string = not in_string
+                        cleaned_line += char
+                    elif char == '%' and not in_string:
+                        break  # Rest of line is comment
+                    else:
+                        cleaned_line += char
+                cleaned_lines.append(cleaned_line)
+            
+            content = '\n'.join(cleaned_lines)
+            
+            # Find BibTeX entries with proper brace matching for multiline support
+            # Pattern matches: @entrytype{key,
+            entry_pattern = r'@(\w+)\s*\{\s*([^,\s}]+)\s*,'
+            
+            pos = 0
+            while pos < len(content):
+                match = re.search(entry_pattern, content[pos:], re.IGNORECASE)
+                if not match:
+                    break
+                    
+                # Extract the citation key
+                entry_type = match.group(1)
+                citation_key = match.group(2)
+                keys.add(citation_key)
+                
+                # Skip past this entry to find the next one
+                # Find the start of the entry content (after the key and comma)
+                start_pos = pos + match.end()
+                
+                # Count braces to find the end of this entry
+                brace_count = 1  # We're inside the opening brace
+                current_pos = start_pos
+                
+                while current_pos < len(content) and brace_count > 0:
+                    char = content[current_pos]
+                    if char == '{':
+                        brace_count += 1
+                    elif char == '}':
+                        brace_count -= 1
+                    current_pos += 1
+                
+                # Move past this entry for next iteration
+                pos = current_pos
                 
         except Exception:
-            pass
+            # Fallback to simple regex if robust parsing fails
+            try:
+                with open(bib_file, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                pattern = r'@\w+\s*\{\s*([^,\s]+)\s*,'
+                for match in re.finditer(pattern, content, re.IGNORECASE):
+                    keys.add(match.group(1))
+            except Exception:
+                pass
         return keys
     
     def extract_bib_keys_from_yaml(self, bib_file: str) -> Set[str]:
