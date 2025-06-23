@@ -185,75 +185,75 @@ GH_PAGER=cat gh pr view [PR_NUMBER] --json comments,reviews --jq '.reviews[] | {
 
 ### Responding to Reviewer Comments
 
-#### Example Process (Based on PR #12 - Branch 6 Implementation)
+#### ENFORCED METHOD: Comprehensive Response with Direct Backlinks
 
-**Step 1: Identify the Comments**
-From the PR view, I identified 2 nitpick-level comments:
-- **Comment 1**: `tex_proofer.py:133` - Expand docstring for `_run_citation_proofer`
-- **Comment 2**: `citation_proofer.py:55` - Replace `assert` with graceful error handling
-
-**Step 2: Address Each Comment Systematically**
-
-For **Comment 1** (Docstring Enhancement):
-```python
-# Before:
-def _run_citation_proofer(tex_file_path: str) -> Optional[ActionableLead]:
-    """Run the comprehensive citation proofer and return parsed result."""
-
-# After:
-def _run_citation_proofer(tex_file_path: str) -> Optional[ActionableLead]:
-    """
-    Run the comprehensive citation proofer and return parsed result.
-    
-    Args:
-        tex_file_path: Path to the TeX file to validate for citation issues.
-        
-    Returns:
-        ActionableLead if citation issues are found, None otherwise.
-        
-    Expected Output Format:
-        The citation proofer script returns structured output on stdout when issues are found:
-        - Exit code 1 with stdout indicates validation error found
-        - First line: "Citation issue found: <description>"
-        - Subsequent lines: Additional context and location information
-        - Exit code 0 indicates no issues found
-        - Non-zero exit code (other than 1) indicates script execution failure
-    """
+**Step 1: Identify All Individual Comments**
+```bash
+# Get all individual line comments from the PR
+GH_PAGER=cat gh api repos/dzackgarza/smart-pandoc-debugger/pulls/[PR_NUMBER]/comments
 ```
 
-For **Comment 2** (Graceful Error Handling):
-```python
-# Before:
-def _run_specialist_script(script_path: str, tex_file: str) -> Optional[str]:
-    """Runs a specialist script and returns its stdout if it finds an error."""
-    assert os.path.exists(script_path), f"Specialist script not found: {script_path}"
+**Step 2: Address Each Comment in Code**
+Fix each technical issue mentioned by reviewers with appropriate commits.
 
-# After:
-def _run_specialist_script(script_path: str, tex_file: str) -> Optional[str]:
-    """Runs a specialist script and returns its stdout if it finds an error."""
-    if not os.path.exists(script_path):
-        logger.warning(f"Specialist script not found: {script_path}")
-        return None
+**Step 3: Create ONE Comprehensive Response Comment**
+```bash
+# REQUIRED FORMAT: Use this exact template
+gh pr comment [PR_NUMBER] --body "## 🔗 Individual Response to Reviewer Comments
+
+### ✅ Comment 1: [Description]
+**Reviewer Comment**: [DIRECT_GITHUB_URL_TO_COMMENT]
+> [Quote the exact reviewer comment]
+
+**Status**: ✅ **Fixed in commit [COMMIT_HASH]**
+
+**Solution**: [Detailed explanation of fix with code examples]
+
+---
+
+### ✅ Comment 2: [Description]  
+**Reviewer Comment**: [DIRECT_GITHUB_URL_TO_COMMENT]
+> [Quote the exact reviewer comment]
+
+**Status**: ✅ **Fixed in commit [COMMIT_HASH]**
+
+**Solution**: [Detailed explanation of fix with code examples]
+
+---
+
+## 🚀 Ready for Resolution
+All reviewer concerns have been addressed with robust implementations and test coverage.
+
+**@[USERNAME]**: You can now click \"Resolve conversation\" on each of the linked comments above! ✅"
 ```
 
-**Step 3: Test the Changes**
+**Step 4: NEVER Add Individual Replies**
+❌ **DO NOT** try to reply to individual comment threads  
+❌ **DO NOT** use GitHub API attempts to reply to line comments  
+✅ **ALWAYS** use the comprehensive backlink method above
+
+**Step 5: Test and Document**
 ```bash
 # Always test after making changes
-PYTHONPATH=./src pytest tests/unit/managers/investigator_team/test_citation_proofer.py -v
+PYTHONPATH=./src pytest [relevant_test_files] -v
+
+# Commit with clear reference to PR
+git commit -m "fix([scope]): Address reviewer feedback from PR #[NUMBER]
+
+- [List each fix with commit reference]
+- [Include technical details]"
 ```
 
-**Step 4: Commit and Push the Fixes**
-```bash
-git add .
-git commit -m "fix(citations): Address reviewer feedback from PR #12
+#### Real-World Example (PR #12 - Branch 6 Implementation)
 
-- Expand docstring for _run_citation_proofer with detailed output format
-- Replace assert with graceful error handling in _run_specialist_script
-- Both changes improve maintainability and robustness as requested"
+**Comments Identified:**
+- **Comment 1**: https://github.com/dzackgarza/smart-pandoc-debugger/pull/12#discussion_r2160579933 - LaTeX citation command extraction  
+- **Comment 2**: https://github.com/dzackgarza/smart-pandoc-debugger/pull/12#discussion_r2160579949 - BibTeX multiline field handling
 
-# Push to update the PR (user must do this step)
-git push
-```
+**Comprehensive Response Created:**
+[#2994717976](https://github.com/dzackgarza/smart-pandoc-debugger/pull/12#issuecomment-2994717976)
+
+**Result**: User could directly click each backlink, review the fix, and resolve the conversation ✅
 
 ### Best Practices for Reviewer Responses
 
@@ -359,7 +359,13 @@ GH_PAGER=cat gh pr create [options]
 The project includes a pre-commit hook that will:
 - Run tests automatically
 - Check for untracked files and potential issues
+- **Display reviewer response protocol reminders** after successful commits
 - Remind you of important checks before committing
+
+**The pre-commit hook will display the ENFORCED reviewer response method** after each successful commit, reminding you to:
+- ✅ Use comprehensive backlink responses 
+- ❌ Avoid individual comment thread replies
+- 📖 Follow the exact protocol in CONTRIBUTING.md
 
 To install the pre-commit hook (if not already installed):
 ```bash
