@@ -263,12 +263,82 @@ git push
 4. **Explain Your Changes**: If the fix isn't obvious, add comments explaining the reasoning
 5. **Be Responsive**: Address feedback promptly to keep the review process moving
 
+### Finding Blocking Conversations
+
+Sometimes the PR merge will be blocked by unresolved conversations. Here's how to identify and address them:
+
+#### A) Identifying Blocking Issues
+
+**Check the PR Status:**
+```bash
+# Check for merge blocking reasons
+GH_PAGER=cat gh pr view [PR_NUMBER] --json mergeable,mergeStateStatus
+```
+
+Look for messages like:
+- "Merging is blocked"
+- "A conversation must be resolved before this pull request can be merged"
+- "This branch is out-of-date with the base branch"
+
+**Common Blocking Reasons:**
+1. **Unresolved Conversations**: Technical concerns that need addressing
+2. **Out-of-date Branch**: Need to merge latest changes from main
+3. **Failed Checks**: Tests or CI/CD pipeline failures
+4. **Required Reviews**: Missing required approvals
+
+#### B) Addressing Technical Concerns
+
+**Example: BibTeX Multiline Field Handling (PR #12)**
+
+**Problem Identified:**
+- Reviewer comment: "does not handle multiline BibTeX field values accurately; consider using a dedicated BibTeX parser or enhancing the regex to robustly support multiline values."
+
+**Solution Process:**
+1. **Identify the Code**: Located the issue in `extract_bib_keys_from_bibtex()` method
+2. **Analyze the Problem**: Simple regex pattern couldn't handle multiline field values or comments
+3. **Implement Robust Solution**: 
+   - Replace simple regex with proper brace counting
+   - Add comment removal that preserves quoted strings
+   - Implement entry boundary detection for multiline support
+   - Include fallback to simple regex for error resilience
+4. **Add Test Coverage**: Create test with complex multiline BibTeX entries
+5. **Verify Fix**: Ensure all existing tests pass and new test validates the fix
+
+**Implementation:**
+```python
+# Before (problematic):
+pattern = r'@\w+\s*\{\s*([^,\s]+)\s*,'
+for match in re.finditer(pattern, content, re.IGNORECASE):
+    keys.add(match.group(1))
+
+# After (robust):
+# Comprehensive parser with comment removal, brace counting,
+# and proper multiline field support (see actual implementation)
+```
+
+#### C) Updating Out-of-Date Branches
+
+```bash
+# Fetch latest changes
+git fetch origin
+
+# Merge main into your feature branch
+git merge origin/main
+
+# Resolve any conflicts if they occur
+# (use git status to see conflicted files)
+
+# Commit the merge
+git commit -m "Merge latest changes from main"
+```
+
 ### Common Reviewer Comment Types
 
 - **[nitpick]**: Minor improvements, style issues, or documentation enhancements
 - **[suggestion]**: Optional improvements that could enhance code quality
 - **[issue]**: Problems that should be addressed before merging
 - **[question]**: Clarifications needed about implementation choices
+- **Technical Concerns**: Complex issues requiring algorithmic or architectural changes
 
 ### GitHub CLI Environment Setup
 
