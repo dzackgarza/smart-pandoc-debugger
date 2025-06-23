@@ -6,6 +6,8 @@ Usage:
     spd doc.md              # Process file and output report to stdout
     cat doc.md | spd        # Process stdin and output report to stdout  
     spd test                # Run internal tiered tests (dev command)
+    spd test-v1             # Run V1.0 roadmap tests
+    spd test-v1 <branch>    # Test a specific branch (1-9)
     spd test-doc doc.md     # Test/analyze a document
 """
 
@@ -393,6 +395,10 @@ def main(argv: Optional[list] = None) -> int:
         if arg == 'test':
             # Internal tiered tests (dev command)
             return run_tiered_tests()
+        elif arg == 'test-v1':
+            # Run all V1 roadmap tests
+            from smart_pandoc_debugger.commands.test_command import test_v1
+            return test_v1()
         elif arg in ['-h', '--help']:
             # Help
             print(__doc__)
@@ -415,6 +421,15 @@ def main(argv: Optional[list] = None) -> int:
         if cmd == 'test-doc':
             # Document testing
             return test_document(arg)
+        elif cmd == 'test-v1':
+            # Test specific branch
+            from smart_pandoc_debugger.commands.test_command import test_branch
+            try:
+                branch_num = int(arg)
+                return test_branch(branch_num)
+            except ValueError:
+                print(f"❌ Invalid branch number: {arg}. Please use a number between 1 and 9.", file=sys.stderr)
+                return 1
         else:
             # Unknown command
             print(f"❌ Unknown command: {cmd}", file=sys.stderr)
@@ -422,6 +437,8 @@ def main(argv: Optional[list] = None) -> int:
             print("  spd doc.md           # Process file", file=sys.stderr)
             print("  cat doc.md | spd     # Process stdin", file=sys.stderr)
             print("  spd test             # Run internal tests", file=sys.stderr)
+            print("  spd test-v1          # Run V1.0 roadmap tests", file=sys.stderr)
+            print("  spd test-v1 <branch> # Test a specific branch (1-9)", file=sys.stderr)
             print("  spd test-doc doc.md  # Test document", file=sys.stderr)
             return 1
     
