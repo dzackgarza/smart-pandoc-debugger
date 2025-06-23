@@ -93,6 +93,65 @@ GH_PAGER=cat gh pr view [PR_NUMBER]
 
 **Never use `--web` flag** - it causes browser errors in this environment.
 
+## Merge Blocked? Troubleshooting Guide
+
+When your PR shows `BLOCKED` status, follow this systematic troubleshooting:
+
+### 1. Check Technical Issues First
+
+```bash
+# Check if branch is out of date
+GH_PAGER=cat gh pr view [PR_NUMBER] | grep -i "out-of-date\|behind"
+
+# Update if needed
+git fetch origin && git merge origin/main
+```
+
+### 2. Check for Unresolved Conversations
+
+```bash
+# View PR status
+GH_PAGER=cat gh pr view [PR_NUMBER] --json mergeStateStatus,mergeable
+```
+
+**Common blocking patterns:**
+- `"mergeStateStatus": "BLOCKED"` + `"mergeable": "MERGEABLE"` = **Unresolved conversations**
+- `"mergeable": "CONFLICTING"` = **Merge conflicts need resolution**
+
+### 3. Verify Your Backlink Responses
+
+**Check you've posted the comprehensive response:**
+1. Did you use the **backlink method** with direct GitHub URLs?
+2. Did you reference specific commit hashes for each fix?
+3. Are all reviewer concerns addressed?
+
+### 4. Prompt User to Resolve Conversations
+
+**If conversations are unresolved, the user must manually resolve them:**
+
+```
+🚨 MERGE BLOCKED: Unresolved conversations detected
+
+I've addressed all reviewer concerns with commits [HASH1], [HASH2].
+Please resolve the conversation threads to unblock merge:
+
+1. Go to: https://github.com/[USER]/smart-pandoc-debugger/pull/[PR_NUMBER]
+2. Click on each reviewer comment thread  
+3. Click "Resolve conversation" after reviewing the fixes
+4. Merge should auto-unblock once all conversations resolved
+
+All technical issues are fixed - just need manual conversation resolution! ✅
+```
+
+### 5. Verify Unblock
+
+```bash
+# Confirm merge is now available
+GH_PAGER=cat gh pr view [PR_NUMBER] | grep -E "(Ready to merge|Merge pull request)"
+```
+
+**This is the exact workflow we use** - address concerns with code, respond with backlinks, then prompt user to resolve conversations for auto-merge activation.
+
 ## Code Standards
 
 The pre-commit hook enforces all code standards automatically. Just follow:
