@@ -38,7 +38,9 @@ CITATION_PROOFER_SCRIPT = os.path.join(TEX_PROOFER_TEAM_DIR, "citation_proofer.p
 
 def _run_specialist_script(script_path: str, tex_file: str) -> Optional[str]:
     """Runs a specialist script and returns its stdout if it finds an error."""
-    assert os.path.exists(script_path), f"Specialist script not found: {script_path}"
+    if not os.path.exists(script_path):
+        logger.warning(f"Specialist script not found: {script_path}")
+        return None
     command = [sys.executable, script_path, tex_file]
     try:
         process = subprocess.run(command, capture_output=True, text=True, check=False, timeout=10)
@@ -131,7 +133,23 @@ def _run_math_proofer(tex_file_path: str) -> Optional[ActionableLead]:
 
 
 def _run_citation_proofer(tex_file_path: str) -> Optional[ActionableLead]:
-    """Run the comprehensive citation proofer and return parsed result."""
+    """
+    Run the comprehensive citation proofer and return parsed result.
+    
+    Args:
+        tex_file_path: Path to the TeX file to validate for citation issues.
+        
+    Returns:
+        ActionableLead if citation issues are found, None otherwise.
+        
+    Expected Output Format:
+        The citation proofer script returns structured output on stdout when issues are found:
+        - Exit code 1 with stdout indicates validation error found
+        - First line: "Citation issue found: <description>"
+        - Subsequent lines: Additional context and location information
+        - Exit code 0 indicates no issues found
+        - Non-zero exit code (other than 1) indicates script execution failure
+    """
     if not os.path.exists(CITATION_PROOFER_SCRIPT):
         logger.debug("Citation proofer script not found, skipping citation checks")
         return None
