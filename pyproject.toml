@@ -9,6 +9,10 @@ description = "A tool for debugging Pandoc and LaTeX errors"
 readme = "readme.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
+dependencies = [
+    "pydantic>=2.0",  # Or your specific version requirement
+    "PyYAML>=5.0"     # Or your specific version requirement
+]
 authors = [
     {name = "Your Name", email = "your.email@example.com"},
 ]
@@ -41,6 +45,12 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = "-v --cov=smart_pandoc_debugger --cov-report=term-missing"
+markers = [
+    "level1: marks tests as level 1 priority",
+    "level2: marks tests as level 2 priority",
+    "integration: marks tests as integration tests",
+    "slow: marks tests as slow to run",
+]
 
 [tool.black]
 line-length = 100

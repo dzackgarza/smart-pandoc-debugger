@@ -1,6 +1,6 @@
 # tests/unit/managers/miner_team/test_markdown_proofer.py
 import pytest
-# from managers.miner_team.markdown_proofer import proof_markdown # Assuming main function
+# from smart_pandoc_debugger.managers.miner_team.markdown_proofer import proof_markdown # Assuming main function
 from smart_pandoc_debugger.data_model import ActionableLead, LeadTypeEnum # ActionableLead might not be directly returned
 
 @pytest.fixture
@@ -19,12 +19,12 @@ def sample_markdown_unclosed_env():
 @pytest.fixture
 def mock_check_unclosed_dollar(mocker):
     # Adjust path according to actual import in markdown_proofer.py
-    return mocker.patch('managers.miner_team.markdown_proofer_team.check_markdown_unclosed_dollar.check')
+    return mocker.patch('smart_pandoc_debugger.managers.miner_team.markdown_proofer_team.check_markdown_unclosed_dollar.main')
 
 @pytest.fixture
 def mock_check_unclosed_envs(mocker):
     # Adjust path according to actual import in markdown_proofer.py
-    return mocker.patch('managers.miner_team.markdown_proofer_team.check_markdown_unclosed_envs.check')
+    return mocker.patch('smart_pandoc_debugger.managers.miner_team.markdown_proofer_team.check_markdown_unclosed_envs.main')
 
 
 def test_mp_no_issues_found_clean_markdown(sample_markdown_clean, mock_check_unclosed_dollar, mock_check_unclosed_envs):

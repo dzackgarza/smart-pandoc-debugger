@@ -115,10 +115,10 @@ def test_ef_handles_log_with_no_line_number_info_gracefully():
     pass
 
 @pytest.fixture
-def mock_find_undefined_command(mocker): # Renamed fixture and target
-    return mocker.patch('managers.investigator_team.undefined_command_proofer.find_undefined_command')
+def mock_run_undefined_command_proofer(mocker): # Renamed fixture and target
+    return mocker.patch('smart_pandoc_debugger.managers.investigator_team.undefined_command_proofer.run_undefined_command_proofer')
 
-def test_ef_dispatches_to_undefined_command_proofer(mock_find_undefined_command, sample_log_undefined_command): # Updated fixture name
+def test_ef_dispatches_to_undefined_command_proofer(mock_run_undefined_command_proofer, sample_log_undefined_command): # Updated fixture name
     """Test that error_finder calls the undefined_command_proofer."""
     # mock_find_undefined_command.return_value = {'error_signature': 'LATEX_UNDEFINED_CONTROL_SEQUENCE', 'raw_error_message': 'From proofer'} # Return data matching proofer's actual output
     # leads_data = find_errors_in_log(sample_log_undefined_command) # find_errors_in_log is the SUT
@@ -128,35 +128,35 @@ def test_ef_dispatches_to_undefined_command_proofer(mock_find_undefined_command,
     pass
 
 def test_ef_dispatches_to_missing_dollar_proofer(mocker, sample_log_missing_dollar):
-    # mock_proofer = mocker.patch('managers.investigator_team.missing_dollar_proofer.check')
+    # mock_proofer = mocker.patch('smart_pandoc_debugger.managers.investigator_team.missing_dollar_proofer.check')
     # mock_proofer.return_value = []
     # find_errors_in_log(sample_log_missing_dollar) # SUT
     # mock_proofer.assert_called_once()
     pass
 
 def test_ef_dispatches_to_runaway_argument_proofer(mocker, sample_log_unbalanced_braces):
-    # mock_proofer = mocker.patch('managers.investigator_team.runaway_argument_proofer.check')
+    # mock_proofer = mocker.patch('smart_pandoc_debugger.managers.investigator_team.runaway_argument_proofer.check')
     # mock_proofer.return_value = []
     # find_errors_in_log(sample_log_unbalanced_braces) # SUT
     # mock_proofer.assert_called_once()
     pass
 
 def test_ef_dispatches_to_undefined_environment_proofer(mocker, sample_log_undefined_env):
-    # mock_proofer = mocker.patch('managers.investigator_team.undefined_environment_proofer.check')
+    # mock_proofer = mocker.patch('smart_pandoc_debugger.managers.investigator_team.undefined_environment_proofer.check')
     # mock_proofer.return_value = []
     # find_errors_in_log(sample_log_undefined_env) # SUT
     # mock_proofer.assert_called_once()
     pass
 
 def test_ef_dispatches_to_tex_proofer_for_delimiters(mocker, sample_log_mismatched_delimiters):
-    # mock_check = mocker.patch('managers.investigator_team.tex_proofer_team.check_tex_paired_delimiters.check_paired_delimiters') # Example specific check
+    # mock_check = mocker.patch('smart_pandoc_debugger.managers.investigator_team.tex_proofer_team.check_tex_paired_delimiters.check_paired_delimiters') # Example specific check
     # mock_check.return_value = []
     # find_errors_in_log(sample_log_mismatched_delimiters) # SUT
     # mock_check.assert_called_once()
     pass
 
 def test_ef_dispatches_to_tex_proofer_for_braces(mocker, sample_log_unbalanced_braces):
-    # mock_check = mocker.patch('managers.investigator_team.tex_proofer_team.check_tex_unbalanced_braces.check_unbalanced_braces') # Example
+    # mock_check = mocker.patch('smart_pandoc_debugger.managers.investigator_team.tex_proofer_team.check_tex_unbalanced_braces.check_unbalanced_braces') # Example
     # mock_check.return_value = []
     # find_errors_in_log(sample_log_unbalanced_braces) # SUT
     # mock_check.assert_called_once()
@@ -188,9 +188,9 @@ def test_ef_no_false_positives_on_common_log_phrases():
 def test_ef_aggregates_results_from_multiple_proofers(mocker, sample_log_undefined_command, sample_log_missing_dollar):
     """Test that results from different proofers are combined."""
     # combined_log = sample_log_undefined_command + "\n" + sample_log_missing_dollar
-    # mock_uc_proofer = mocker.patch('managers.investigator_team.undefined_command_proofer.check')
+    # mock_uc_proofer = mocker.patch('smart_pandoc_debugger.managers.investigator_team.undefined_command_proofer.check')
     # mock_uc_proofer.return_value = [{'description': 'uc error'}]
-    # mock_md_proofer = mocker.patch('managers.investigator_team.missing_dollar_proofer.check')
+    # mock_md_proofer = mocker.patch('smart_pandoc_debugger.managers.investigator_team.missing_dollar_proofer.check')
     # mock_md_proofer.return_value = [{'description': 'missing dollar'}]
     #
     # leads_data = find_errors_in_log(combined_log) # SUT
@@ -201,7 +201,7 @@ def test_ef_aggregates_results_from_multiple_proofers(mocker, sample_log_undefin
 
 def test_ef_handles_proofer_raising_exception(mocker, sample_log_undefined_command):
     """Test if error_finder gracefully handles a proofer script failing."""
-    # mock_failing_proofer = mocker.patch('managers.investigator_team.undefined_command_proofer.check')
+    # mock_failing_proofer = mocker.patch('smart_pandoc_debugger.managers.investigator_team.undefined_command_proofer.check')
     # mock_failing_proofer.side_effect = Exception("Proofer crashed")
     #
     # # Option 1: error_finder catches and logs, returns other findings
