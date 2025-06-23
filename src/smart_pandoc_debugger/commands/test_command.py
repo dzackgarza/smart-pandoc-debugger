@@ -49,6 +49,11 @@ BRANCH_TESTS = {
         "status": "incomplete",
         "description": "Code block and structure validation"
     },
+    "branch11_documentation_updates": {
+        "test_name": "TestDocumentationUpdates.test_branch11_documentation_updates",
+        "status": "complete",
+        "description": "Documentation and contribution guidelines updates"
+    },
     "branch5_references": {
         "test_name": "TestV1RoadmapCompliance.test_branch5_reference_validation",
         "status": "incomplete",
@@ -250,7 +255,7 @@ def test_branch(branch_number: int, console: Optional[Console] = None) -> int:
     """Run tests for a specific branch.
     
     Args:
-        branch_number: Branch number (1-9)
+        branch_number: Branch number (1-9, 11+ for additional branches)
         console: Optional rich console instance
         
     Returns:
