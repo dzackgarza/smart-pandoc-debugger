@@ -4,25 +4,25 @@ Smart Pandoc Debugger - Dead Simple CLI Interface
 
 Usage:
     spd doc.md              # Process file and output report to stdout
-    cat doc.md | spd        # Process stdin and output report to stdout  
+    cat doc.md | spd        # Process stdin and output report to stdout
     spd test                # Run internal tiered tests (dev command)
     spd test-v1             # Run V1.0 roadmap tests
     spd test-v1 <branch>    # Test a specific branch (1-9)
     spd test-doc doc.md     # Test/analyze a document
+    spd respond-to-pr [PR_NUMBER]     # Help respond to PR comments (for LLMs)
 """
 
-import sys
 import subprocess
-import json
+import sys
 from pathlib import Path
 from typing import Optional
 
 # ANSI color codes
-GREEN = '\033[92m'
-RED = '\033[91m'
-YELLOW = '\033[93m'
-BLUE = '\033[94m'
-RESET = '\033[0m'
+GREEN = "\033[92m"
+RED = "\033[91m"
+YELLOW = "\033[93m"
+BLUE = "\033[94m"
+RESET = "\033[0m"
 
 
 def colorize(text: str, color: str) -> str:
@@ -34,74 +34,76 @@ def colorize(text: str, color: str) -> str:
 
 def process_document(input_file: Optional[str] = None) -> int:
     """Process a markdown document and output diagnostic report.
-    
+
     Args:
         input_file: Path to markdown file. If None, reads from stdin.
-        
+
     Returns:
         int: Exit code (0 for success, non-zero for errors)
     """
     try:
         # For now, output a simple placeholder report
         # TODO: Integrate with actual diagnostic pipeline
-        
+
         if input_file:
             if not Path(input_file).exists():
                 print(f"Error: File '{input_file}' not found", file=sys.stderr)
                 return 1
-            
-            content = Path(input_file).read_text(encoding='utf-8')
-            print(f"📄 Analyzing: {input_file}")
+
+            content = Path(input_file).read_text(encoding="utf-8")
+            print("📄 Analyzing:", input_file)
         else:
             # Read from stdin
             content = sys.stdin.read()
             print("📄 Analyzing stdin input")
-        
+
         # Simple analysis placeholder
         print()
         print("🔍 DIAGNOSTIC REPORT")
         print("=" * 50)
-        
+
         # Basic checks
-        lines = content.split('\n')
+        lines = content.split("\n")
         word_count = len(content.split())
-        
-        print(f"📊 Document Stats:")
+
+        print("📊 Document Stats:")
         print(f"   • Lines: {len(lines)}")
         print(f"   • Words: {word_count}")
         print(f"   • Characters: {len(content)}")
         print()
-        
+
         # Check for common issues
         issues = []
-        
-        if '$' in content and content.count('$') % 2 != 0:
+
+        if "$" in content and content.count("$") % 2 != 0:
             issues.append("❌ Unmatched dollar signs (potential math mode issue)")
-            
-        if '\\begin{' in content:
-            begin_count = content.count('\\begin{')
-            end_count = content.count('\\end{')
+
+        if "\\begin{" in content:
+            begin_count = content.count("\\begin{")
+            end_count = content.count("\\end{")
             if begin_count != end_count:
-                issues.append(f"❌ Unmatched LaTeX environments ({begin_count} begins, {end_count} ends)")
-        
-        if '{' in content:
-            open_count = content.count('{')
-            close_count = content.count('}')
+                issues.append(
+                    f"❌ Unmatched LaTeX environments ({begin_count} begins, {end_count} ends)"
+                )
+
+        if "{" in content:
+            open_count = content.count("{")
+            close_count = content.count("}")
             if open_count != close_count:
                 issues.append(f"❌ Unmatched braces ({open_count} open, {close_count} close)")
-        
+
         if issues:
             print("🚨 Issues Found:")
             for issue in issues:
                 print(f"   {issue}")
         else:
             print("✅ No obvious issues detected")
-        
+
         print()
         print("💡 For detailed analysis, the full diagnostic pipeline is under development.")
-        
+
         return 0
-        
+
     except KeyboardInterrupt:
         print("\n❌ Operation cancelled by user", file=sys.stderr)
         return 1
@@ -112,10 +114,10 @@ def process_document(input_file: Optional[str] = None) -> int:
 
 def test_document(input_file: str) -> int:
     """Test/analyze a document with detailed output.
-    
+
     Args:
         input_file: Path to markdown file to test.
-        
+
     Returns:
         int: Exit code (0 for success, non-zero for errors)
     """
@@ -123,28 +125,28 @@ def test_document(input_file: str) -> int:
         if not Path(input_file).exists():
             print(f"❌ Error: File '{input_file}' not found", file=sys.stderr)
             return 1
-        
-        content = Path(input_file).read_text(encoding='utf-8')
-        print(f"🧪 Testing Document: {input_file}")
+
+        content = Path(input_file).read_text(encoding="utf-8")
+        print("🧪 Testing Document:", input_file)
         print("=" * 50)
-        
+
         # More detailed analysis for testing
-        lines = content.split('\n')
+        lines = content.split("\n")
         word_count = len(content.split())
-        
+
         # Test results tracking
         tests_passed = 0
         tests_total = 0
-        
-        print(f"📊 Document Analysis:")
+
+        print("📊 Document Analysis:")
         print(f"   • File size: {len(content)} characters")
         print(f"   • Line count: {len(lines)}")
         print(f"   • Word count: {word_count}")
         print()
-        
+
         # Test 1: Dollar sign matching
         tests_total += 1
-        dollar_count = content.count('$')
+        dollar_count = content.count("$")
         if dollar_count == 0:
             print("✅ Math delimiters: No math found")
             tests_passed += 1
@@ -153,11 +155,11 @@ def test_document(input_file: str) -> int:
             tests_passed += 1
         else:
             print(f"❌ Math delimiters: Unmatched $ (total: {dollar_count})")
-        
+
         # Test 2: LaTeX environment matching
         tests_total += 1
-        begin_count = content.count('\\begin{')
-        end_count = content.count('\\end{')
+        begin_count = content.count("\\begin{")
+        end_count = content.count("\\end{")
         if begin_count == 0 and end_count == 0:
             print("✅ LaTeX environments: None found")
             tests_passed += 1
@@ -166,42 +168,45 @@ def test_document(input_file: str) -> int:
             tests_passed += 1
         else:
             print(f"❌ LaTeX environments: Unmatched ({begin_count} begins, {end_count} ends)")
-        
+
         # Test 3: Brace matching
         tests_total += 1
-        open_braces = content.count('{')
-        close_braces = content.count('}')
+        open_braces = content.count("{")
+        close_braces = content.count("}")
         if open_braces == close_braces:
             print(f"✅ Brace matching: {open_braces} pairs matched")
             tests_passed += 1
         else:
             print(f"❌ Brace matching: Unmatched ({open_braces} open, {close_braces} close)")
-        
+
         # Test 4: Basic markdown structure
         tests_total += 1
-        has_headers = any(line.strip().startswith('#') for line in lines)
+        has_headers = any(line.strip().startswith("#") for line in lines)
         if has_headers:
             print("✅ Document structure: Headers found")
             tests_passed += 1
         else:
             print("⚠️  Document structure: No headers detected")
-        
+
         print()
         print("=" * 50)
-        
+
         # Summary
         percentage = (tests_passed / tests_total) * 100 if tests_total > 0 else 0
         if tests_passed == tests_total:
             color = GREEN
             status = "PASSED"
         else:
-            color = RED  
+            color = RED
             status = "FAILED"
-        
-        print(f"📋 Test Results: {colorize(f'{tests_passed}/{tests_total} ({percentage:.0f}%) - {status}', color)}")
-        
+
+        print(
+            f"📋 Test Results: "
+            f"{colorize(f'{tests_passed}/{tests_total} ({percentage:.0f}%) - {status}', color)}"
+        )
+
         return 0 if tests_passed == tests_total else 1
-        
+
     except Exception as e:
         print(f"❌ Error: {str(e)}", file=sys.stderr)
         return 1
@@ -209,134 +214,157 @@ def test_document(input_file: str) -> int:
 
 def run_tiered_tests() -> int:
     """Run internal tests in tiers, only proceeding if previous tier passes 100%.
-    
+
     Returns:
         int: Exit code (0 if all tiers pass, non-zero otherwise)
     """
     print("🧪 Running Internal Tiered Tests")
     print("=" * 50)
-    
+
     # Define test tiers
     tiers = [
         {
-            'name': 'Tier 1: Core Data Models',
-            'pattern': 'tests/unit/utils/test_data_model.py',
-            'description': 'Basic data structure validation'
+            "name": "Tier 1: Core Data Models",
+            "pattern": "tests/unit/utils/test_data_model.py",
+            "description": "Basic data structure validation",
         },
         {
-            'name': 'Tier 2: User Expectations',
-            'pattern': 'tests/unit/user_expectations/',
-            'description': 'Functionality users expect (development roadmap)'
+            "name": "Tier 2: User Expectations",
+            "pattern": "tests/unit/user_expectations/",
+            "description": "Functionality users expect (development roadmap)",
         },
         {
-            'name': 'Tier 3: Manager Units', 
-            'pattern': 'tests/unit/managers/',
-            'description': 'Individual manager functionality'
+            "name": "Tier 3: Manager Units",
+            "pattern": "tests/unit/managers/",
+            "description": "Individual manager functionality",
         },
         {
-            'name': 'Tier 4: Integration',
-            'pattern': 'tests/integration/',
-            'description': 'Cross-component integration'
+            "name": "Tier 4: Integration",
+            "pattern": "tests/integration/",
+            "description": "Cross-component integration",
         },
         {
-            'name': 'Tier 5: End-to-End',
-            'pattern': 'tests/e2e/',
-            'description': 'Full pipeline testing'
-        }
+            "name": "Tier 5: End-to-End",
+            "pattern": "tests/e2e/",
+            "description": "Full pipeline testing",
+        },
     ]
-    
+
     overall_success = True
     failed_tier = None
-    
+
     def get_tier_test_count(pattern):
         """Get the total number of tests for a tier pattern."""
         try:
-            cmd = ['python', '-m', 'pytest', pattern, '--collect-only', '-q', '--cov-report=', '--cov-config=/dev/null']
+            cmd = [
+                "python",
+                "-m",
+                "pytest",
+                pattern,
+                "--collect-only",
+                "-q",
+                "--cov-report=",
+                "--cov-config=/dev/null",
+            ]
             result = subprocess.run(cmd, capture_output=True, text=True)
-            lines = result.stdout.split('\n')
-            
+            lines = result.stdout.split("\n")
+
             # Look for line like "N tests collected" or "N items collected"
             import re
+
             for line in lines:
-                if 'collected' in line:
+                if "collected" in line:
                     # Try different formats: "20 tests collected", "20 items collected"
-                    match = re.search(r'(\d+)\s+(?:tests?|items?)\s+collected', line)
+                    match = re.search(r"(\d+)\s+(?:tests?|items?)\s+collected", line)
                     if match:
                         return int(match.group(1))
                     # Also try "collected N items"
-                    match = re.search(r'collected\s+(\d+)\s+(?:tests?|items?)', line)
+                    match = re.search(r"collected\s+(\d+)\s+(?:tests?|items?)", line)
                     if match:
                         return int(match.group(1))
             return 1  # Default fallback
         except Exception:
             return 1  # Default fallback
-    
+
     for i, tier in enumerate(tiers, 1):
         print(f"\n🔄 {tier['name']}")
         print(f"   {tier['description']}")
-        
+
         # If a previous tier failed, show this tier as not reached
         if failed_tier is not None:
-            total = get_tier_test_count(tier['pattern'])
+            total = get_tier_test_count(tier["pattern"])
             status_text = f"❌ 0/{total}, 0%"
             print(f"   {colorize(status_text, RED)}")
             continue
-        
+
         try:
             # Run pytest for this tier with coverage files in temp directory
-            import tempfile
             import os
-            temp_dir = tempfile.mkdtemp(prefix='spd_coverage_')
-            coverage_file = os.path.join(temp_dir, '.coverage')
-            
-            cmd = ['python', '-m', 'pytest', tier['pattern'], '-v', '--tb=short', '--disable-warnings', 
-                   f'--cov-report=', f'--cov-config=/dev/null', f'--cov-append', f'--cov-fail-under=0']
-            
+            import tempfile
+
+            temp_dir = tempfile.mkdtemp(prefix="spd_coverage_")
+            coverage_file = os.path.join(temp_dir, ".coverage")
+
+            cmd = [
+                "python",
+                "-m",
+                "pytest",
+                tier["pattern"],
+                "-v",
+                "--tb=short",
+                "--disable-warnings",
+                f"--cov-report=",
+                f"--cov-config=/dev/null",
+                f"--cov-append",
+                f"--cov-fail-under=0",
+            ]
+
             # Set coverage data file location via environment
             env = os.environ.copy()
-            env['COVERAGE_FILE'] = coverage_file
-            
+            env["COVERAGE_FILE"] = coverage_file
+
             result = subprocess.run(cmd, capture_output=True, text=True, env=env)
-            
+
             # Clean up temp coverage directory
             try:
                 import shutil
+
                 shutil.rmtree(temp_dir)
-            except:
+            except BaseException:
                 pass  # Ignore cleanup errors
-            
+
             # Parse results - look for the summary line
-            lines = result.stdout.split('\n')
+            lines = result.stdout.split("\n")
             summary_line = None
             for line in lines:
-                if '=' in line and ('passed' in line or 'failed' in line):
+                if "=" in line and ("passed" in line or "failed" in line):
                     summary_line = line.strip()
                     break
-            
+
             if summary_line:
                 # Extract passed/total from summary
                 # Handle formats like: "48 passed, 1 warning" or "5 failed, 3 passed"
                 import re
-                
+
                 # Extract numbers followed by "passed" and "failed"
-                passed_match = re.search(r'(\d+)\s+passed', summary_line)
-                failed_match = re.search(r'(\d+)\s+failed', summary_line)
-                error_match = re.search(r'(\d+)\s+error', summary_line)
-                
+                passed_match = re.search(r"(\d+)\s+passed", summary_line)
+                failed_match = re.search(r"(\d+)\s+failed", summary_line)
+                error_match = re.search(r"(\d+)\s+error", summary_line)
+
                 passed = int(passed_match.group(1)) if passed_match else 0
                 failed = int(failed_match.group(1)) if failed_match else 0
                 errors = int(error_match.group(1)) if error_match else 0
-                
+
                 total = passed + failed + errors
                 percentage = round((passed / total * 100)) if total > 0 else 0
-                success = (failed == 0 and errors == 0)
+                success = failed == 0 and errors == 0
             else:
                 # No clear summary, check return code
                 success = result.returncode == 0
                 passed = 1 if success else 0
                 total = 1
                 percentage = 100 if success else 0
-            
+
             # Display results
             if success and percentage == 100:
                 status_color = GREEN
@@ -346,19 +374,19 @@ def run_tiered_tests() -> int:
                 status_text = f"❌ {passed}/{total}, {percentage}%"
                 overall_success = False
                 failed_tier = i
-            
+
             print(f"   {colorize(status_text, status_color)}")
-            
+
             # If this tier failed, mark it but continue to show remaining tiers
             if not success or percentage != 100:
-                if result.stderr and 'coverage' not in result.stderr.lower():
+                if result.stderr and "coverage" not in result.stderr.lower():
                     print(f"\nError output:\n{result.stderr}")
-                
+
         except Exception as e:
             print(f"   {colorize(f'❌ Error running tests: {e}', RED)}")
             overall_success = False
             failed_tier = i
-    
+
     print(f"\n{'='*50}")
     if overall_success:
         print(colorize("🎉 All tiers passed!", GREEN))
@@ -372,41 +400,72 @@ def run_tiered_tests() -> int:
         return 1
 
 
-def main(argv: Optional[list] = None) -> int:
-    """Main entry point for the Smart Pandoc Debugger CLI.
-    
-    Args:
-        argv: Command line arguments. If None, uses sys.argv[1:].
-        
-    Returns:
-        int: Exit code (0 for success, non-zero for errors)
+def run_pr_response_helper() -> int:
     """
-    if argv is None:
-        argv = sys.argv[1:]
-    
-    # Dead simple interface - no argparse needed
-    if len(argv) == 0:
+    Run the PR response helper to assist LLMs in responding to reviewer comments.
+
+    This command implements the exact protocol described in CONTRIBUTING.md
+    for responding to Codepilot and other reviewer comments with proper backlinks.
+
+    Returns:
+        int: Exit code (0 for success, 1 for failure)
+    """
+    try:
+        import os
+        import subprocess
+        import sys
+
+        # Get the project root directory
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+        helper_script = os.path.join(project_root, "utils", "pr_response_helper.py")
+
+        if not os.path.exists(helper_script):
+            print("❌ Error: PR response helper script not found.")
+            print(f"Expected at: {helper_script}")
+            return 1
+
+        # Pass through all command line arguments except the 'respond-to-pr' command
+        args = sys.argv[2:]  # Skip 'spd' and 'respond-to-pr'
+        cmd = [sys.executable, helper_script] + args
+
+        # Run the helper script with non-interactive environment
+        env = {**os.environ, "GH_PAGER": "cat", "GH_PROMPT_DISABLED": "1"}
+        result = subprocess.run(cmd, env=env, input="")
+        return result.returncode
+
+    except Exception as e:
+        print(f"❌ Error running PR response helper: {e}")
+        return 1
+
+
+def main():
+    """Main entry point for the Smart Pandoc Debugger CLI."""
+    argv = sys.argv[1:]  # Remove script name
+
+    if not argv:
         # No arguments - read from stdin
         return process_document()
-    
-    elif len(argv) == 1:
+
+    if len(argv) == 1:
         arg = argv[0]
-        
-        if arg == 'test':
+
+        if arg == "test":
             # Internal tiered tests (dev command)
             return run_tiered_tests()
-        elif arg == 'test-v1':
+        elif arg == "test-v1":
             # Run all V1 roadmap tests
             from smart_pandoc_debugger.commands.test_command import test_v1
+
             return test_v1()
-        elif arg in ['-h', '--help']:
+        elif arg in ["-h", "--help"]:
             # Help
             print(__doc__)
             return 0
-        elif arg in ['-v', '--version']:
+        elif arg in ["-v", "--version"]:
             # Version
             try:
                 from smart_pandoc_debugger import __version__
+
                 print(f"Smart Pandoc Debugger v{__version__}")
             except ImportError:
                 print("Smart Pandoc Debugger v0.1.0")
@@ -414,41 +473,55 @@ def main(argv: Optional[list] = None) -> int:
         else:
             # Assume it's a file
             return process_document(arg)
-    
+
     elif len(argv) == 2:
         cmd, arg = argv[0], argv[1]
-        
-        if cmd == 'test-doc':
+
+        if cmd == "test-doc":
             # Document testing
             return test_document(arg)
-        elif cmd == 'test-v1':
+        elif cmd == "test-v1":
             # Test specific branch
             from smart_pandoc_debugger.commands.test_command import test_branch
+
             try:
                 branch_num = int(arg)
                 return test_branch(branch_num)
             except ValueError:
-                print(f"❌ Invalid branch number: {arg}. Please use a number between 1 and 9.", file=sys.stderr)
+                print(
+                    f"❌ Invalid branch number: {arg}. Please use a number between 1 and 9.",
+                    file=sys.stderr,
+                )
                 return 1
+        elif cmd == "respond-to-pr":
+            # PR response helper for LLMs
+            # Temporarily modify sys.argv to pass the PR number
+            original_argv = sys.argv[:]
+            sys.argv = ["spd", "respond-to-pr", arg]
+            try:
+                return run_pr_response_helper()
+            finally:
+                sys.argv = original_argv
         else:
             # Unknown command
             print(f"❌ Unknown command: {cmd}", file=sys.stderr)
             print("Usage:", file=sys.stderr)
-            print("  spd doc.md           # Process file", file=sys.stderr)
-            print("  cat doc.md | spd     # Process stdin", file=sys.stderr)
-            print("  spd test             # Run internal tests", file=sys.stderr)
-            print("  spd test-v1          # Run V1.0 roadmap tests", file=sys.stderr)
-            print("  spd test-v1 <branch> # Test a specific branch (1-9)", file=sys.stderr)
-            print("  spd test-doc doc.md  # Test document", file=sys.stderr)
+            print("  spd doc.md                    # Process file", file=sys.stderr)
+            print("  cat doc.md | spd              # Process stdin", file=sys.stderr)
+            print("  spd test                      # Run internal tests", file=sys.stderr)
+            print("  spd test-v1                   # Run V1.0 roadmap tests", file=sys.stderr)
+            print("  spd test-v1 <branch>          # Test a specific branch (1-9)", file=sys.stderr)
+            print("  spd test-doc doc.md           # Test document", file=sys.stderr)
+            print("  spd respond-to-pr [PR_NUMBER] # Help respond to PR comments", file=sys.stderr)
             return 1
-    
+
+    elif len(argv) >= 2 and argv[0] == "respond-to-pr":
+        # Handle respond-to-pr with optional arguments
+        return run_pr_response_helper()
+
     else:
-        # Too many arguments
-        print("Usage:", file=sys.stderr)
-        print("  spd doc.md           # Process file", file=sys.stderr)
-        print("  cat doc.md | spd     # Process stdin", file=sys.stderr)
-        print("  spd test             # Run internal tests", file=sys.stderr)
-        print("  spd test-doc doc.md  # Test document", file=sys.stderr)
+        print("❌ Too many arguments", file=sys.stderr)
+        print(__doc__)
         return 1
 
 
