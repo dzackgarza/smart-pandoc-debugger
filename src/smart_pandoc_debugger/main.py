@@ -400,8 +400,9 @@ def run_pr_response_helper() -> int:
         args = sys.argv[2:]  # Skip 'spd' and 'respond-to-pr'
         cmd = [sys.executable, helper_script] + args
         
-        # Run the helper script
-        result = subprocess.run(cmd)
+        # Run the helper script with non-interactive environment
+        env = {**os.environ, "GH_PAGER": "cat", "GH_PROMPT_DISABLED": "1"}
+        result = subprocess.run(cmd, env=env, input="")
         return result.returncode
         
     except Exception as e:

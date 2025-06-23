@@ -19,22 +19,21 @@ Author: Smart Pandoc Debugger Team
 
 import argparse
 import json
-import re
 import subprocess
 import sys
 from typing import Dict, List, Optional, Tuple
-from urllib.parse import urlparse
 
 
 def run_gh_command(cmd: List[str]) -> Tuple[str, str, int]:
     """Run a GitHub CLI command with proper environment setup."""
-    env = {"GH_PAGER": "cat"}
+    env = {"GH_PAGER": "cat", "GH_PROMPT_DISABLED": "1"}
     try:
         result = subprocess.run(
-            cmd, 
-            capture_output=True, 
-            text=True, 
-            env={**os.environ, **env}
+            cmd,
+            capture_output=True,
+            text=True,
+            env={**os.environ, **env},
+            input=""  # Provide empty stdin to prevent interactive prompts
         )
         return result.stdout, result.stderr, result.returncode
     except FileNotFoundError:
@@ -193,7 +192,7 @@ def get_latest_commit_hash() -> str:
         )
         if result.returncode == 0:
             return result.stdout.strip()
-    except:
+    except Exception:
         pass
     return "[COMMIT_HASH]"
 
@@ -277,12 +276,14 @@ Examples:
             # Try to get PR number from current branch
             result = subprocess.run([
                 "gh", "pr", "view", "--json", "number"
-            ], capture_output=True, text=True)
+            ], capture_output=True, text=True, 
+            env={**os.environ, "GH_PAGER": "cat", "GH_PROMPT_DISABLED": "1"},
+            input="")
             if result.returncode == 0:
                 pr_data = json.loads(result.stdout)
                 pr_number = str(pr_data["number"])
                 print(f"🔍 Auto-detected PR #{pr_number}")
-        except:
+        except Exception:
             pass
     
     if not pr_number:
