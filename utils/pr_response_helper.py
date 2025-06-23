@@ -217,7 +217,7 @@ def print_instructions(pr_number: str, response_template: str):
     # Escape quotes in the response template for the shell command
     escaped_template = response_template.replace('"', '\\"').replace('`', '\\`')
     
-    print(f'GH_PAGER=cat gh pr comment {pr_number} --body "{escaped_template}"')
+    print(f'GH_PAGER=cat GH_PROMPT_DISABLED=1 gh pr comment {pr_number} --body "{escaped_template}"')
     print("-"*40)
     
     print("\n📝 STEP 4: Update Response After Fixing")
@@ -232,11 +232,13 @@ def print_instructions(pr_number: str, response_template: str):
     print("   - 'Fixed typo in variable name in commit def456'")
     print("   - 'Added docstring as requested in commit ghi789'")
     
-    print(f"\n⚠️  CRITICAL RULES:")
+    print("\n⚠️  CRITICAL RULES:")
     print("   ❌ NEVER reply to individual comment threads")
     print("   ❌ NEVER use --web flag with gh commands")
+    print("   ❌ NEVER use gh pr create without proper flags (it becomes interactive!)")
     print("   ✅ ALWAYS use ONE comprehensive response with backlinks")
-    print("   ✅ ALWAYS use GH_PAGER=cat with gh commands")
+    print("   ✅ ALWAYS use GH_PAGER=cat GH_PROMPT_DISABLED=1 with gh commands")
+    print("   ✅ If gh commands fail with auth, ask user to run the command")
     
     print("\n🎯 Success Criteria:")
     print("   - All concerns addressed in code")
