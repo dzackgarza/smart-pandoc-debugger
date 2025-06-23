@@ -18,157 +18,13 @@ Author: Smart Pandoc Debugger Team
 """
 
 import argparse
-import json
 import subprocess
 import sys
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
-
-def run_gh_command(cmd: List[str]) -> Tuple[str, str, int]:
-    """Run a GitHub CLI command with proper environment setup."""
-    env = {"GH_PAGER": "cat", "GH_PROMPT_DISABLED": "1"}
-    try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            env={**os.environ, **env},
-            input=""  # Provide empty stdin to prevent interactive prompts
-        )
-        return result.stdout, result.stderr, result.returncode
-    except FileNotFoundError:
-        print("❌ Error: GitHub CLI (gh) not found. Please install it first.")
-        sys.exit(1)
-
-
-def get_pr_info(pr_number: str) -> Dict:
-    """Fetch PR information including repository details."""
-    print(f"🔍 Fetching PR #{pr_number} information...")
-
-    stdout, stderr, returncode = run_gh_command([
-        "gh", "pr", "view", pr_number, "--json",
-        "number,title,url,reviews,comments,mergeable,mergeStateStatus,statusCheckRollup"
-    ])
-
-    if returncode != 0:
-        print(f"❌ Error fetching PR info: {stderr}")
-        sys.exit(1)
-
-    try:
-        return json.loads(stdout)
-    except json.JSONDecodeError as e:
-        print(f"❌ Error parsing PR data: {e}")
-        sys.exit(1)
-
-
-def check_pr_blockers(pr_info: Dict) -> List[str]:
-    """Check for PR blockers like merge conflicts, failing checks, etc."""
-    blockers = []
-
-    # Check for merge conflicts
-    mergeable = pr_info.get("mergeable")
-    if mergeable == "CONFLICTING":
-        blockers.append(
-            "🚫 **MERGE CONFLICTS**: This branch has conflicts that must be resolved"
-        )
-    elif mergeable == "UNKNOWN":
-        blockers.append(
-            "⚠️  **MERGE STATUS UNKNOWN**: GitHub is still checking for conflicts"
-        )
-
-    # Check merge state status
-    merge_state = pr_info.get("mergeStateStatus")
-    if merge_state == "BLOCKED":
-        blockers.append(
-            "🚫 **MERGE BLOCKED**: PR is blocked by branch protection rules"
-        )
-    elif merge_state == "BEHIND":
-        blockers.append(
-            "⚠️  **BRANCH BEHIND**: Branch is behind the base branch and needs update"
-        )
-    elif merge_state == "DRAFT":
-        blockers.append("📝 **DRAFT PR**: This is a draft PR and cannot be merged yet")
-
-    # Check status checks
-    status_rollup = pr_info.get("statusCheckRollup")
-    if status_rollup:
-        state = status_rollup.get("state")
-        if state == "FAILURE":
-            blockers.append("❌ **FAILING CHECKS**: Some required status checks are failing")
-        elif state == "PENDING":
-            blockers.append("⏳ **PENDING CHECKS**: Status checks are still running")
-        elif state == "ERROR":
-            blockers.append("💥 **CHECK ERRORS**: Some status checks encountered errors")
-
-    return blockers
-
-
-def print_blocker_instructions(blockers: List[str]):
-    """Print instructions for resolving PR blockers."""
-    print("\n" + "=" * 80)
-    print("🚨 PR BLOCKED: Issues Must Be Resolved Before Merge")
-    print("=" * 80)
-
-    for i, blocker in enumerate(blockers, 1):
-        print(f"\n{i}. {blocker}")
-
-    print("\n🔧 **Common Solutions:**")
-
-    if any("MERGE CONFLICTS" in blocker for blocker in blockers):
-        print("\n**For Merge Conflicts:**")
-        print("   1. Update your branch: `git fetch origin && git merge origin/main`")
-        print("   2. Resolve conflicts in your editor")
-        print("   3. Commit the resolution: `git commit`")
-        print("   4. Push the changes: `git push`")
-
-    if any("BRANCH BEHIND" in blocker for blocker in blockers):
-        print("\n**For Branch Behind:**")
-        print("   1. Update your branch: `git fetch origin && git merge origin/main`")
-        print("   2. Push the updates: `git push`")
-
-    if any("FAILING CHECKS" in blocker for blocker in blockers):
-        print("\n**For Failing Checks:**")
-        print("   1. Check the 'Checks' tab in the PR to see which tests failed")
-        print("   2. Fix the failing tests or code issues")
-        print("   3. Commit and push your fixes")
-
-    print("\n⚠️  **Once all blockers are resolved, the PR will be ready for merge!**")
-
-
-def get_review_comments(pr_number: str) -> List[Dict]:
-    """Fetch all review comments from the PR."""
-    print(f"💬 Fetching review comments for PR #{pr_number}...")
-
-    stdout, stderr, returncode = run_gh_command([
-        "gh", "api", f"/repos/{{owner}}/{{repo}}/pulls/{pr_number}/comments"
-    ])
-
-    if returncode != 0:
-        print(f"❌ Error fetching review comments: {stderr}")
-        return []
-
-    try:
-        return json.loads(stdout)
-    except json.JSONDecodeError:
-        return []
-
-
-def get_issue_comments(pr_number: str) -> List[Dict]:
-    """Fetch all issue comments (general PR comments) from the PR."""
-    print(f"💭 Fetching issue comments for PR #{pr_number}...")
-
-    stdout, stderr, returncode = run_gh_command([
-        "gh", "api", f"/repos/{{owner}}/{{repo}}/issues/{pr_number}/comments"
-    ])
-
-    if returncode != 0:
-        print(f"❌ Error fetching issue comments: {stderr}")
-        return []
-
-    try:
-        return json.loads(stdout)
-    except json.JSONDecodeError:
-        return []
+from gh_api_client import (auto_detect_pr_number, get_issue_comments,
+                           get_pr_info, get_review_comments)
+from pr_blockers import check_pr_blockers, print_blocker_instructions
 
 
 def extract_comment_info(comment: Dict, comment_type: str) -> Dict:
@@ -182,47 +38,41 @@ def extract_comment_info(comment: Dict, comment_type: str) -> Dict:
         "type": comment_type
     }
 
-    # Add line-specific info for review comments
+    # Add path and line info for review comments
     if comment_type == "review" and "path" in comment:
-        info["path"] = comment.get("path", "")
-        info["line"] = comment.get("line", "")
-        info["diff_hunk"] = comment.get("diff_hunk", "")
+        info["path"] = comment["path"]
+        info["line"] = comment.get("line", comment.get("original_line"))
 
     return info
 
 
 def is_from_bot(comment: Dict) -> bool:
-    """Check if comment is from a bot (like Codepilot)."""
-    user_login = comment["user"]["login"]
-    return (
-        "bot" in user_login.lower() or
-        "codepilot" in user_login.lower() or
-        comment["user"]["type"] == "Bot"
-    )
+    """Check if comment is from a bot or automation."""
+    user = comment.get("user", {})
+    login = user.get("login", "").lower()
+
+    bot_indicators = ["bot", "codepilot", "github-actions", "dependabot"]
+    return any(indicator in login for indicator in bot_indicators)
 
 
 def format_comment_for_response(comment_info: Dict, index: int) -> str:
-    """Format a single comment for the backlink response."""
-    comment_type = comment_info["type"]
-    user = comment_info["user"]
+    """Format a single comment for the response template."""
     html_url = comment_info["html_url"]
     body = comment_info["body"]
+    body_preview = body[:100] + "..." if len(body) > 100 else body
 
-    # Truncate long comments for the summary
-    body_preview = body[:200] + "..." if len(body) > 200 else body
-    body_preview = body_preview.replace("\n", " ").strip()
+    response_section = f"### {index}. [📝 Resolve Comment #{comment_info['id']}]({html_url})"
+    response_section += f"\n**Author**: {comment_info['user']}"
 
-    response_section = f"### ✅ Comment {index}: {user} ({comment_type})"
-
-    if comment_info["type"] == "review" and comment_info.get("path"):
-        response_section += f" on {comment_info['path']}"
+    if comment_info.get("path"):
+        response_section += f"\n**File**: {comment_info['path']}"
         if comment_info.get("line"):
-            response_section += f":{comment_info['line']}"
+            response_section += f" (line {comment_info['line']})"
 
     response_section += f"\n**Link**: {html_url}"
     response_section += f"\n**Comment**: {body_preview}"
-    response_section += f"\n**Status**: ⏳ Reviewing..."
-    response_section += f"\n**Solution**: [To be filled in after fixing]"
+    response_section += "\n**Status**: ⏳ Reviewing..."
+    response_section += "\n**Solution**: [To be filled in after fixing]"
 
     return response_section
 
@@ -301,7 +151,7 @@ def print_instructions(pr_number: str, response_template: str):
     print("   - Specific solutions implemented")
     print("   - Change 'Status: ⏳ Reviewing...' to 'Status: ✅ Fixed in commit [HASH]'")
 
-    print(f"\n🔗 STEP 5: Template for Updates")
+    print("\n🔗 STEP 5: Template for Updates")
     print("   Replace '[To be filled in after fixing]' with specific solutions like:")
     print("   - 'Added missing import in commit abc123'")
     print("   - 'Fixed typo in variable name in commit def456'")
@@ -349,19 +199,7 @@ Examples:
     # Auto-detect PR number if not provided
     pr_number = args.pr_number
     if not pr_number:
-        try:
-            # Try to get PR number from current branch
-            result = subprocess.run([
-                "gh", "pr", "view", "--json", "number"
-            ], capture_output=True, text=True,
-                env={**os.environ, "GH_PAGER": "cat", "GH_PROMPT_DISABLED": "1"},
-                input="")
-            if result.returncode == 0:
-                pr_data = json.loads(result.stdout)
-                pr_number = str(pr_data["number"])
-                print(f"🔍 Auto-detected PR #{pr_number}")
-        except Exception:
-            pass
+        pr_number = auto_detect_pr_number()
 
     if not pr_number:
         print("❌ Error: No PR number provided and couldn't auto-detect.")
@@ -377,7 +215,7 @@ Examples:
     print(f"🔗 PR URL: {pr_info['url']}")
 
     # Check for PR blockers
-    blockers = check_pr_blockers(pr_info)
+    blockers = check_pr_blockers(pr_info, pr_number)
     if blockers:
         print_blocker_instructions(blockers)
         return
@@ -416,5 +254,4 @@ Examples:
 
 
 if __name__ == "__main__":
-    import os
     main()
