@@ -37,32 +37,66 @@ Branch naming conventions:
 ### 3. Make Changes
 
 1. Make your code changes following the project's coding standards
-2. Add tests for new functionality
+2. Add tests for new functionality with proper assertions
 3. Run tests locally:
    ```bash
    PYTHONPATH=./src pytest tests/ -v
    ```
-4. The project includes a pre-commit hook that will run tests automatically before each commit
+4. The project includes a pre-commit hook that will:
+   - Run tests automatically
+   - Check for untracked files and potential issues
+   - Remind you of important checks before committing
 
-### 4. Commit Your Changes
+### 4. Repository Cleanliness
 
-1. Stage your changes:
+Before committing, ensure:
+
+- 🧹 Remove all temporary and debug files
+- 📂 Organize test/debug files in appropriate directories
+- 🚫 Never commit sensitive information (API keys, credentials, etc.)
+- 📏 Avoid committing large files (>5MB). Use git-lfs if necessary
+- 🔍 Review all changes with `git diff --cached` before committing
+
+Common files/directories to exclude (add to `.gitignore` if needed):
+- `*.pyc`, `__pycache__/`, `*.swp`, `*.swo`
+- Virtual environments: `venv/`, `.venv/`, `env/`
+- Build artifacts: `dist/`, `build/`, `*.egg-info/`
+- Local configuration files
+- Log files and databases
+
+### 5. Commit Your Changes
+
+1. Review your changes:
    ```bash
-   git add <changed-files>
+   git status
+   git diff --cached
    ```
-2. Commit with a descriptive message:
+
+2. Stage your changes:
    ```bash
-   git commit -m "feat: Add new feature"
+   # Stage specific files
+   git add <changed-files>
+   
+   # Or stage all changes
+   # git add .
+   ```
+
+3. Commit with a descriptive message:
+   ```bash
+   git commit -m "feat(scope): Add new feature"
    ```
    
-   Commit message format:
+   #### Commit Message Format:
    ```
    type(scope): description
    
    Detailed description if needed
+   
+   - Bullet points for important changes
+   - Reference issues with #123
    ```
    
-   Types:
+   ##### Types:
    - `feat`: New feature
    - `fix`: Bug fix
    - `docs`: Documentation changes
@@ -70,21 +104,57 @@ Branch naming conventions:
    - `refactor`: Code refactoring
    - `test`: Test related changes
    - `chore`: Maintenance tasks
+   
+   ##### Scope Examples:
+   - `feat(api)`: API-related feature
+   - `fix(cli)`: CLI-related bug fix
+   - `docs(readme)`: README updates
 
-### 5. Push Changes to Remote
+### 6. Push Changes to Remote
 
 1. Push your branch to GitHub:
    ```bash
+   # First push to a new branch
    git push -u origin feature/descriptive-branch-name
+   
+   # Subsequent pushes
+   # git push
    ```
    
-   **Important**: You must be the one to push changes to the remote repository. The automated assistant can help with local changes but will not push to remote.
+   **Important**: 
+   - You must be the one to push changes to the remote repository.
+   - The automated assistant can help with local changes but will not push to remote.
+   - Ensure all tests pass before pushing.
 
-### 6. Create a Pull Request
+### 7. Create a Pull Request
 
-1. Create a pull request from your fork to the main repository
+1. Create a pull request from your fork to the main repository using the GitHub CLI:
+   ```bash
+   gh pr create --title "feat(scope): Your descriptive title" --body """
+   ## 🎯 [Brief Description of Changes]
+   
+   [Detailed description of what this PR does and why it's needed]
+   
+   ### ✅ Features Implemented
+   - [ ] Feature 1
+   - [ ] Feature 2
+   
+   ### 🧪 Testing
+   - [ ] All tests pass
+   - [ ] New tests added for new features
+   - [ ] Test coverage maintained or improved
+   
+   ### 📝 Documentation
+   - [ ] Code is well-documented
+   - [ ] README/CHANGELOG updated if needed
+   - [ ] Project documentation (roadmap, etc.) updated to reflect completed work
+   """ --web
+   ```
+   
+   Or create the PR through the GitHub web interface.
+
 2. Update the project documentation to mark your branch as completed in the roadmap or relevant documentation
-3. Use the following PR template:
+3. Ensure your PR includes:
 
    ```markdown
    ## 🎯 [Brief Description of Changes]
@@ -106,9 +176,10 @@ Branch naming conventions:
    - [ ] Project documentation (roadmap, etc.) updated to reflect completed work
    ```
 
-3. After creating the PR, get the automated Copilot review by running:
+4. After creating the PR, get the automated Copilot review by running:
    ```bash
-   GH_PAGER=cat gh pr view --json reviews
+   # View all PR comments and reviews
+   gh pr view --json comments,reviews --jq '.reviews[] | {body, comments: .comments[].body, path: .comments[].path, line: .comments[].line}'
    ```
    
    This will display the automated review from Copilot. You must:
@@ -116,6 +187,23 @@ Branch naming conventions:
    - Make necessary changes locally
    - Push the updates to your branch
    - The PR will only be accepted once all review comments are resolved
+   
+5. Check for any CI/CD failures and fix them before requesting review
+6. Request review from maintainers after addressing all automated review comments
+
+## Pre-commit Hook
+
+The project includes a pre-commit hook that will:
+- Run tests automatically
+- Check for untracked files and potential issues
+- Remind you of important checks before committing
+
+To install the pre-commit hook (if not already installed):
+```bash
+chmod +x .git/hooks/pre-commit
+```
+
+The hook will help ensure code quality by catching common issues before they're committed.
 
 4. Request review from maintainers after addressing all automated review comments
 
@@ -136,9 +224,17 @@ Branch naming conventions:
 ## Review Process
 
 1. All PRs require at least one approval
-2. Address all review comments
-3. Update the PR with any requested changes
-4. Once approved, a maintainer will merge your PR
+2. To view all reviewer and Copilot comments, including those on specific lines of code, use:
+   ```bash
+   # View all PR comments and reviews
+   gh pr view 11 --json comments,reviews --jq '.reviews[] | {body, comments: .comments[].body, path: .comments[].path, line: .comments[].line}'
+   
+   # Or view comments in the GitHub web interface at:
+   # https://github.com/your-username/smart-pandoc-debugger/pull/PR_NUMBER
+   ```
+3. Address all review comments
+4. Update the PR with any requested changes
+5. Once approved, a maintainer will merge your PR
 
 ## Reporting Issues
 

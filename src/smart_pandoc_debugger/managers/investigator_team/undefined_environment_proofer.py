@@ -7,18 +7,19 @@ This specialist tool analyzes LaTeX compilation logs for "Environment ... undefi
 errors and provides detailed information about the undefined environment.
 """
 
-import json
-import re
-import sys
-import os
-from typing import Dict, Optional, List, Any
-import re
-import json
-import os
-import sys
+# Standard library imports
 import argparse
+import json
+import os
+import re
+import sys
 from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
+
+# Third-party imports
 from pydantic import Field
+
+# Local application imports
 from smart_pandoc_debugger.data_model import ActionableLead as BaseActionableLead, SourceContextSnippet
 
 # Create a test-specific version of ActionableLead that includes test-specific fields
