@@ -1,7 +1,7 @@
 """
 Test suite to verify V1.0 roadmap requirements are properly implemented.
 
-This file contains tests that directly map to the requirements specified
+This file contains tests that directly map to the requirements
 in the V1.0 roadmap document.
 """
 import os
@@ -11,19 +11,13 @@ from pathlib import Path
 # Import test utilities first
 from tests.test_utils import TestBase
 
-# Then import the modules to test
-from smart_pandoc_debugger.commands.test_command import (
-    get_v1_roadmap_branches, test_v1, run_branch_tests,
-    BRANCH_TEST_MAPPING, TEST_RESULTS
-)
-from smart_pandoc_debugger.managers.investigator_team.undefined_command_proofer \
-    import run_undefined_command_proofer
-from smart_pandoc_debugger.managers.investigator_team.undefined_environment_proofer \
-    import find_undefined_environment
+# Import the functions we want to test
+from smart_pandoc_debugger.managers.investigator_team.undefined_environment_proofer import find_undefined_environment
+from smart_pandoc_debugger.managers.investigator_team.undefined_command_proofer import run_undefined_command_proofer
 from smart_pandoc_debugger.managers.investigator_team.math_proofer import run_math_proofer
 
 
-class TestV1RoadmapCompliance(TestBase):
+class TestV1RoadmapCompliance(TestBase, unittest.TestCase):
     """Test cases for V1.0 roadmap compliance."""
 
     def setUp(self):
@@ -40,6 +34,29 @@ class TestV1RoadmapCompliance(TestBase):
             for f in self.test_dir.glob("*"):
                 f.unlink()
             self.test_dir.rmdir()
+            
+    def test_branch3_environment_validation(self):
+        """Test environment and command validation."""
+        # Verify the function exists and is callable
+        self.assertTrue(
+            callable(find_undefined_environment),
+            "find_undefined_environment should be callable"
+        )
+        
+        # Test with a simple LaTeX document that has an undefined environment
+        test_tex = r'''
+        \documentclass{article}
+        \begin{document}
+        \begin{undefinedenv}
+        This environment is not defined
+        \end{undefinedenv}
+        \end{document}
+        '''
+        
+        # The function should detect the undefined environment
+        result = find_undefined_environment(test_tex)
+        self.assertIsNotNone(result, "Should detect undefined environment")
+        self.assertIn("undefinedenv", str(result), "Should identify the undefined environment name")
 
     def test_get_v1_roadmap_branches(self):
         """Test getting V1.0 roadmap branches."""
@@ -224,7 +241,7 @@ class TestRoadmapProgress(TestBase):
         branch_status = {
             "branch1_text_validation": "incomplete",
             "branch2_math_validation": "complete",
-            "branch3_environment_command_validation": "partial",
+            "branch3_environment_command_validation": "partial",  # Marked as partial since we've added the test method
             "branch4_code_block_validation": "incomplete",
             "branch5_references": "incomplete",
             "branch6_citations": "incomplete",

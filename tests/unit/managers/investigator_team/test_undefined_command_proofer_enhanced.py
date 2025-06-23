@@ -175,9 +175,12 @@ def test_main_with_source_file(monkeypatch, capsys, tmp_path):
     
     # Create a temporary source file
     source_file = tmp_path / "test.tex"
-    source_file.write_text("\\documentclass{article}\\n                           \\begin{document}\
-                           \\foobar
-                           \\end{document}")
+    source_file.write_text(
+        "\\documentclass{article}\n"
+        "\\begin{document}\n"
+        "\\foobar\n"
+        "\\end{document}"
+    )
     
     try:
         with patch('sys.argv', [

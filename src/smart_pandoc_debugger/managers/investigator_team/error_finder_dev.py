@@ -30,10 +30,11 @@ if not logging.getLogger().hasHandlers() and not logger.hasHandlers():
 # Common error signatures based on keywords.# Ordered list of error patterns and their corresponding signatures
 ERROR_SIGNATURES = [
     # Missing math delimiters - match the exact test case format
-    (r"! Missing \\$ inserted", "LATEX_MISSING_MATH_DELIMITERS"),
+    (r"! Missing \$ inserted", "LATEX_MISSING_MATH_DELIMITERS"),
     
     # Mismatched delimiters - look for patterns like \left( \right]
-    (r"Missing \\right\.? inserted", "LATEX_MISMATCHED_DELIMITERS"),
+    (r"! Missing \\right\.", "LATEX_MISMATCHED_DELIMITERS"),  # Matches "! Missing \\right."
+    (r"Missing \\right\.", "LATEX_MISMATCHED_DELIMITERS"),  # Matches "Missing \\right." without the !
     (r"Extra \\right", "LATEX_MISMATCHED_DELIMITERS"),
     (r"Delimiter .*?\n.*?missing", "LATEX_MISMATCHED_DELIMITERS"),
     (r"\\left\(.*?\\right\]", "LATEX_MISMATCHED_DELIMITERS"),  # Matches \left( ... \right]
@@ -46,6 +47,7 @@ ERROR_SIGNATURES = [
     
     # Undefined control sequences - match the exact test case format
     (r"! Undefined control sequence", "LATEX_UNDEFINED_CONTROL_SEQUENCE"),
+    (r"! Undefined control sequence\.", "LATEX_UNDEFINED_CONTROL_SEQUENCE"),
     
     # Missing \begin{document}
     (r"Missing \\begin\{document\}", "LATEX_MISSING_DOCUMENT"),

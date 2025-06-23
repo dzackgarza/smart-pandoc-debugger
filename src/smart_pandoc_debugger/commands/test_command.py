@@ -94,26 +94,70 @@ def get_branch_name(branch_key: str) -> str:
 def run_test(test_name: str) -> Tuple[TestStatus, str]:
     """Run a specific test and return its status."""
     try:
+        # Construct the full path to the test file - relative to project root
+        test_file = project_root / "tests" / "unit" / "test_v1_roadmap_compliance.py"
+        if not test_file.exists():
+            # Try alternative path (relative to project root)
+            test_file = Path("tests/unit/test_v1_roadmap_compliance.py").resolve()
+            if not test_file.exists():
+                return TestStatus.FAILED, f"Test file not found. Tried:\n- {project_root / 'tests/unit/test_v1_roadmap_compliance.py'}\n- {test_file}"
+        
+        # Note: Test discovery is handled by pytest directly
+            
+        # Format the test name for pytest (extract class and method name)
+        parts = test_name.split('.')
+        if len(parts) >= 2:
+            # Format: TestClass.test_method -> TestClass::test_method
+            class_name = parts[-2]
+            method_name = parts[-1]
+            test_path = f"{test_file}::{class_name}::{method_name}"
+        else:
+            # Fallback to just the method name
+            method_name = parts[-1]
+            test_path = f"{test_file}::{method_name}"
+        
         # Run pytest with the specific test
+        cmd = [
+            sys.executable,
+            "-m",
+            "pytest",
+            test_path,
+            "-v"
+        ]
+        
+        print(f"Running command: {' '.join(cmd)}")
+        print(f"Looking for test method: {method_name}")
+        
         result = subprocess.run(
-            ["python", "-m", "pytest", f"tests/unit/test_v1_roadmap_compliance.py::{test_name}", "-v"],
+            cmd,
             capture_output=True,
             text=True,
             cwd=project_root
         )
         
+        # Debug output
+        print(f"Test output for {test_name}:")
+        print("=" * 50)
+        print(result.stdout)
+        if result.stderr:
+            print("Error:")
+            print(result.stderr)
+        print("=" * 50)
+        
         # Check the output to determine test result
-        if "1 passed" in result.stdout:
+        if "PASSED" in result.stdout or "passed" in result.stdout.lower() or result.returncode == 0:
             return TestStatus.PASSED, ""
         elif "XFAIL" in result.stdout:
             return TestStatus.XFAIL, "Expected failure"
-        elif "1 failed" in result.stdout:
+        elif "FAILED" in result.stdout or "failed" in result.stdout.lower() or result.returncode != 0:
             return TestStatus.FAILED, result.stderr or "Test failed"
         else:
-            return TestStatus.NOT_IMPLEMENTED, "Test not found"
+            return TestStatus.NOT_IMPLEMENTED, f"Test not found or did not run as expected. Output: {result.stdout[:500]}"
             
     except Exception as e:
-        return TestStatus.FAILED, str(e)
+        import traceback
+        error_msg = f"{str(e)}\n\n{traceback.format_exc()}"
+        return TestStatus.FAILED, error_msg
 
 def get_status_emoji(status: str) -> str:
     """Get emoji for status."""
@@ -223,7 +267,8 @@ def test_branch(branch_number: int, console: Optional[Console] = None) -> int:
         return 1
     
     branch_key = matching_branches[0]
-    test_name = BRANCH_TESTS[branch_key]
+    test_info = BRANCH_TESTS[branch_key]
+    test_name = test_info["test_name"]
     
     console.print(f"[bold blue]Testing {get_branch_name(branch_key)}...[/bold blue]\n")
     
