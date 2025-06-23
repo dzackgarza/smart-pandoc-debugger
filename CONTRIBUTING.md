@@ -1,25 +1,119 @@
 # Contributing to Smart Pandoc Debugger
 
-Thank you for your interest in contributing! This document outlines the essential steps.
+Thank you for your interest in contributing to Smart Pandoc Debugger! This document outlines the process for contributing to the project.
 
-## Quick Start
+## PR Status Messages
+
+### Checking for Merge Conflicts
+
+#### Via GitHub Web Interface
+1. When viewing a PR, look for the merge conflict banner:
+   ```
+   This branch has conflicts that must be resolved
+   Use the web editor or the command line to resolve conflicts before continuing.
+   ```
+2. Check the "Conversation" tab for any automated messages about merge conflicts
+3. Look for the "Resolve conflicts" button near the bottom of the PR page
+
+#### Via GitHub CLI
+
+1. **Check merge conflict status**
+   ```bash
+   # Check if PR has conflicts (returns 'true' if conflicts exist)
+   gh pr view 13 --json mergeable,mergeableState | jq '.mergeable == false and .mergeableState == "dirty"'
+   ```
+
+2. **View detailed PR status**
+   ```bash
+   # Get detailed PR information including merge status
+   gh pr view 13 --json mergeable,mergeableState,mergeStateStatus,mergeCommit,autoMergeRequest
+   ```
+
+3. **Automatically detect conflicting files**
+   ```bash
+   # Get list of all modified files in the PR
+   PR_FILES=$(gh pr view 13 --json files --jq '.files[].path')
+   
+   # Check each file for conflicts
+   for file in $PR_FILES; do
+     if ! git diff --quiet --diff-filter=U -- "$file" 2>/dev/null; then
+       echo "Conflict found in: $file"
+     fi
+   done
+   ```
+
+4. **One-command conflict check**
+   ```bash
+   # Single command to list all conflicting files in the PR
+   gh pr view 13 --json files --jq '.files[].path' | while read -r file; do git diff --name-only --diff-filter=U -- "$file" 2>/dev/null; done | grep -v '^$'
+   ```
+
+5. **Check specific PR for conflicts (replace PR_NUMBER)**
+   ```bash
+   # Function to check conflicts for a PR
+   check_pr_conflicts() {
+     local pr=$1
+     echo "Checking PR #$pr for conflicts..."
+     if gh pr view $pr --json mergeable,mergeableState | jq -e '.mergeable == false and .mergeableState == "dirty"' >/dev/null; then
+       echo "❌ Conflicts detected in PR #$pr"
+       echo "Files with conflicts:"
+       gh pr view $pr --json files --jq '.files[].path' | while read -r file; do 
+         git diff --name-only --diff-filter=U -- "$file" 2>/dev/null; 
+       done | grep -v '^$' | sort | uniq | sed 's/^/  - /'
+     else
+       echo "✅ No conflicts detected in PR #$pr"
+     fi
+   }
+   
+   # Example usage:
+   # check_pr_conflicts 13
+   ```
+
+#### Common Conflict Scenarios
+- Files modified in both branches:
+  - `src/smart_pandoc_debugger/managers/investigator_team/undefined_environment_proofer.py`
+  - Other files modified in both the PR and target branch
+
+#### Required Status Checks
+- Check that all required status checks are passing
+- Look for any failing tests or linting errors
+- Ensure the branch is up to date with the target branch
+
+## Development Workflow
 
 ### 1. Setup
 
-1. Fork and clone the repository:
+1. Fork the repository to your GitHub account
+2. Clone your fork locally:
    ```bash
    git clone https://github.com/your-username/smart-pandoc-debugger.git
    cd smart-pandoc-debugger
    ```
-
-2. Set up development environment:
+3. Set up the development environment:
    ```bash
    python -m venv .venv
    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
    pip install -e .[dev]
    ```
 
-### 2. Development Workflow
+### 2. Create a Feature Branch
+
+Always create a new branch for your changes:
+
+```bash
+git checkout -b feature/descriptive-branch-name
+```
+
+### 3. Make Changes and Test
+
+1. Make your code changes following the project's coding standards
+2. Add tests for new functionality
+3. Run tests locally:
+   ```bash
+   PYTHONPATH=./src pytest tests/ -v
+   ```
+
+### 4. Push Changes and Create PR
 
 1. **Create a branch**: `git checkout -b feature/your-feature-name`
 2. **Make changes**: Edit code and add tests
@@ -74,6 +168,7 @@ This command will:
 - ✅ Show you the precise GitHub CLI command to post it
 - ✅ Provide step-by-step instructions for fixing issues
 - ✅ Enforce the correct response protocol automatically
+- ✅ Check for merge conflicts and other PR blockers
 
 **No more manual template construction or guessing!**
 
@@ -116,80 +211,39 @@ When your PR shows `BLOCKED` status, follow this systematic troubleshooting:
 
 ### 1. Check Technical Issues First
 
-```bash
-# Check if branch is out of date
-GH_PAGER=cat gh pr view [PR_NUMBER] | grep -i "out-of-date\|behind"
+1. Push your branch to GitHub:
+   ```bash
+   git push -u origin feature/descriptive-branch-name
+   ```
 
-# Update if needed
-git fetch origin && git merge origin/main
-```
+2. Create a pull request using the GitHub web interface or CLI:
+   ```bash
+   gh pr create --title "type(scope): description" --body "## Description\n\nDetailed description of changes\n\n### Changes\n- [x] Change 1\n- [x] Change 2" --base main
+   ```
 
-### 2. Check for Unresolved Conversations
+3. **Check for PR Status Messages**
+   - Look for any conflict warnings or required checks
+   - Address any issues before requesting review
 
-```bash
-# View PR status
-GH_PAGER=cat gh pr view [PR_NUMBER] --json mergeStateStatus,mergeable
-```
+4. Address any review comments and update the PR as needed
 
-**Common blocking patterns:**
-- `"mergeStateStatus": "BLOCKED"` + `"mergeable": "MERGEABLE"` = **Unresolved conversations**
-- `"mergeable": "CONFLICTING"` = **Merge conflicts need resolution**
+## Code Style
 
-### 3. Verify Your Backlink Responses
-
-**Check you've posted the comprehensive response:**
-1. Did you use the **backlink method** with direct GitHub URLs?
-2. Did you reference specific commit hashes for each fix?
-3. Are all reviewer concerns addressed?
-
-### 4. Prompt User to Resolve Conversations
-
-**If conversations are unresolved, the user must manually resolve them:**
-
-```
-🚨 MERGE BLOCKED: Unresolved conversations detected
-
-I've addressed all reviewer concerns with commits [HASH1], [HASH2].
-Please resolve the conversation threads to unblock merge:
-
-1. Go to: https://github.com/[USER]/smart-pandoc-debugger/pull/[PR_NUMBER]
-2. Click on each reviewer comment thread  
-3. Click "Resolve conversation" after reviewing the fixes
-4. Merge should auto-unblock once all conversations resolved
-
-All technical issues are fixed - just need manual conversation resolution! ✅
-```
-
-### 5. Verify Unblock
-
-```bash
-# Confirm merge is now available
-GH_PAGER=cat gh pr view [PR_NUMBER] | grep -E "(Ready to merge|Merge pull request)"
-```
-
-**This is the exact workflow we use** - address concerns with code, respond with backlinks, then prompt user to resolve conversations for auto-merge activation.
-
-## Code Standards
-
-The pre-commit hook enforces all code standards automatically. Just follow:
-- Write clear, tested code
-- Add docstrings to public functions
-- Use type hints
-- Keep files modular (≤200 actual code lines, ≤300 total lines)
-- Keep functions focused and small
+- Follow [PEP 8](https://www.python.org/dev/peps/pep-0008/) for Python code
+- Use type hints for all function signatures
+- Keep lines under 100 characters
+- Include docstrings for all public functions and classes
 
 ## Testing
 
-Add tests for new functionality. The pre-commit hook will:
-- Run all MVP tests automatically
-- Check test coverage ratios
-- Block commits if tests fail
+- Write tests for all new functionality
+- Run tests before pushing code
+- Maintain or improve test coverage
+- Use descriptive test names that explain what's being tested
 
-```bash
-# Run tests manually:
-PYTHONPATH=./src pytest tests/ -v
-```
+## Review Process
 
-## Questions?
-
-The pre-commit hook provides real-time guidance for most development questions. For complex issues, create a GitHub issue or ask in your PR. 
+1. All PRs require at least one approval
+2. Address all review comments
+3. Update the PR with any requested changes
+4. Once approved, a maintainer will merge your PR
