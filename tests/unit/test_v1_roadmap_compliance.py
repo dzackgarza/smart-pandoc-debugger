@@ -6,6 +6,7 @@ in the V1.0 roadmap document.
 """
 import os
 import unittest
+from unittest import mock
 from pathlib import Path
 
 # Import test utilities first
